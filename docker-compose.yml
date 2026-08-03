@@ -2,6 +2,7 @@ services:
   frontend:
     build: .
     container_name: aether-frontend
+    restart: unless-stopped
     ports:
       - "5173:5173"
     volumes:
