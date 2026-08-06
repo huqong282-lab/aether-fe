@@ -1,96 +1,91 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-chat: #36393f;
+  --color-bg-sidebar: #2f3136;
+  --color-bg-server-rail: #202225;
+  --color-brand: #5865f2;
+  --color-status-online: #3ba55d;
+  --color-status-idle: #faa61a;
+  --color-status-dnd: #ed4245;
+  --color-status-offline: #747f8d;
+  --color-text-secondary: #747f8d;
+  --color-text-primary: #ffffff;
+}
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  /* UI/UX Specification 2.1 - Palet Warna (Dark Theme Default) */
+  --bg-chat: #36393f;            /* Background utama (chat area) */
+  --bg-sidebar: #2f3136;         /* Background sidebar channel */
+  --bg-server-rail: #202225;     /* Background server rail */
+  --brand: #5865f2;              /* Warna aksen/brand (tombol primer, link, mention) */
+  --status-online: #3ba55d;      /* Status online */
+  --status-idle: #faa61a;        /* Status idle */
+  --status-dnd: #ed4245;         /* Status Do Not Disturb / error */
+  --status-offline: #747f8d;     /* Status offline/invisible & teks sekunder */
+  --text-secondary: #747f8d;     /* Teks sekunder */
+  --text-primary: #ffffff;       /* Teks utama di atas background gelap */
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* General aliases & helper variables */
+  --bg: var(--bg-chat);
+  --text: var(--text-primary);
+  --text-h: var(--text-primary);
+  --accent: var(--brand);
+  --accent-bg: rgba(88, 101, 242, 0.15);
+  --accent-border: rgba(88, 101, 242, 0.5);
+  --border: #202225;
+  --code-bg: #2f3136;
+  --social-bg: rgba(47, 48, 58, 0.5);
+  --shadow: rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
 
-  font: 18px/145% var(--sans);
+  --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: Consolas, 'Fira Code', ui-monospace, monospace;
+
+  font: 16px/145% var(--sans);
   letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
+  color-scheme: dark;
+  color: var(--text-primary);
+  background-color: var(--bg-chat);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
   @media (max-width: 1024px) {
-    font-size: 16px;
+    font-size: 15px;
   }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  background-color: var(--bg-chat);
+  color: var(--text-primary);
+  font-family: var(--sans);
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background-color: var(--bg-chat);
+  color: var(--text-primary);
 }
 
 h1,
-h2 {
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
 p {
   margin: 0;
 }
@@ -100,12 +95,13 @@ code,
   font-family: var(--mono);
   display: inline-flex;
   border-radius: 4px;
-  color: var(--text-h);
+  color: var(--text-primary);
 }
 
 code {
-  font-size: 15px;
+  font-size: 14px;
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
