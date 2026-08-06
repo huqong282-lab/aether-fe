@@ -1,107 +1,47 @@
 @import "tailwindcss";
 
-@theme {
-  --color-bg-chat: #36393f;
-  --color-bg-sidebar: #2f3136;
-  --color-bg-server-rail: #202225;
-  --color-brand: #5865f2;
-  --color-status-online: #3ba55d;
-  --color-status-idle: #faa61a;
-  --color-status-dnd: #ed4245;
-  --color-status-offline: #747f8d;
-  --color-text-secondary: #747f8d;
-  --color-text-primary: #ffffff;
-}
-
 :root {
-  /* UI/UX Specification 2.1 - Palet Warna (Dark Theme Default) */
-  --bg-chat: #36393f;            /* Background utama (chat area) */
-  --bg-sidebar: #2f3136;         /* Background sidebar channel */
-  --bg-server-rail: #202225;     /* Background server rail */
-  --brand: #5865f2;              /* Warna aksen/brand (tombol primer, link, mention) */
-  --status-online: #3ba55d;      /* Status online */
-  --status-idle: #faa61a;        /* Status idle */
-  --status-dnd: #ed4245;         /* Status Do Not Disturb / error */
-  --status-offline: #747f8d;     /* Status offline/invisible & teks sekunder */
-  --text-secondary: #747f8d;     /* Teks sekunder */
-  --text-primary: #ffffff;       /* Teks utama di atas background gelap */
-
-  /* General aliases & helper variables */
-  --bg: var(--bg-chat);
-  --text: var(--text-primary);
-  --text-h: var(--text-primary);
-  --accent: var(--brand);
-  --accent-bg: rgba(88, 101, 242, 0.15);
-  --accent-border: rgba(88, 101, 242, 0.5);
-  --border: #202225;
-  --code-bg: #2f3136;
-  --social-bg: rgba(47, 48, 58, 0.5);
-  --shadow: rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-
-  --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: Consolas, 'Fira Code', ui-monospace, monospace;
-
-  font: 16px/145% var(--sans);
-  letter-spacing: 0.18px;
   color-scheme: dark;
-  color: var(--text-primary);
-  background-color: var(--bg-chat);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: #050816;
+  color: #ffffff;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
 
-  @media (max-width: 1024px) {
-    font-size: 15px;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
 }
 
 body {
   margin: 0;
-  background-color: var(--bg-chat);
-  color: var(--text-primary);
-  font-family: var(--sans);
+  min-height: 100vh;
+  min-height: 100svh;
+  background: #050816;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
 }
 
 #root {
-  width: 100%;
   min-height: 100vh;
   min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  background-color: var(--bg-chat);
-  color: var(--text-primary);
 }
-
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  font-family: var(--heading);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-primary);
-}
-
-code {
-  font-size: 14px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}
-
