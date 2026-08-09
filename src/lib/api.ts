@@ -1,8 +1,12 @@
 import axios, { type InternalAxiosRequestConfig, type AxiosResponse, type AxiosError } from "axios";
 import { useAuthStore } from "../state/auth.state";
 
-// Dynamic base URL from environment or default to local API endpoint
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+// Dynamic base URL from environment or default to local API endpoint.
+// Support both env names so existing setup keeps working.
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:5000/api";
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,

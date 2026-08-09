@@ -1,5 +1,3 @@
-export type AuthMode = 'login' | 'register'
-
 export const featureItems = [
   {
     title: 'Chat',
@@ -58,3 +56,4 @@ export function GoogleIcon() {
     </svg>
   )
 }
+
