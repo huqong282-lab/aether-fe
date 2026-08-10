@@ -30,15 +30,6 @@ export type ActiveNowItem = {
   badge?: string
 }
 
-export const serverItems = [
-  { label: 'Aether', accent: 'bg-[#5865F2]', active: true },
-  { label: 'DS', accent: 'bg-[#3BA55D]' },
-  { label: 'JS', accent: 'bg-[#ED4245]' },
-  { label: 'UX', accent: 'bg-[#FAA61A]' },
-  { label: 'AI', accent: 'bg-[#3BA55D]' },
-  { label: 'Add', accent: 'bg-white/10' },
-] as const
-
 export const sidebarItems: SidebarItem[] = [
   { label: 'Friends', icon: 'friends', active: true },
   { label: 'Shop', icon: 'shop' },
