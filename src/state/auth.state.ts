@@ -29,9 +29,11 @@ function extractSessionIdFromAccessToken(token: string): string | null {
 
     const normalized = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
     const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
-    const decoder = typeof globalThis.atob === "function"
-      ? globalThis.atob
-      : (value: string) => Buffer.from(value, "base64").toString("utf8");
+    if (typeof globalThis.atob !== "function") {
+      return null;
+    }
+
+    const decoder = globalThis.atob;
     const payload = JSON.parse(decoder(padded)) as { sessionId?: unknown };
 
     return typeof payload.sessionId === "string" ? payload.sessionId : null;
