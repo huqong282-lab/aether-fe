@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { ReactElement } from 'react'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { normalizeApiError } from '../../lib/api-error'
@@ -183,7 +184,7 @@ function TrashIcon({ className }: IconProps) {
 
 type SectionItem = {
   label: string
-  icon: (props: IconProps) => JSX.Element
+  icon: (props: IconProps) => ReactElement
   active?: boolean
   onClick?: () => void
 }

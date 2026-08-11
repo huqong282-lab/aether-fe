@@ -33,14 +33,6 @@ function HeadphonesIcon() {
   )
 }
 
-function CaretDownIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
-      <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
 function UserAvatar() {
   return (
     <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-fuchsia-500 to-rose-500">
