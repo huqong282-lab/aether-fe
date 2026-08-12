@@ -1,6 +1,13 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../../state/auth.state";
+import { useServerRailStore } from "../../state/server.state";
 import { RealtimeConnectionProvider, useRealtimeConnection } from "../../lib/websocket";
+import {
+  getOwnedServersRequest,
+  ownedServersQueryKey,
+  type ServerRecord,
+} from "../../lib/server/server.api";
 import { AppCreateServerModal } from "./components/AppCreateServerModal";
 import { AppMain } from "./components/AppMain";
 import { AppServerRail } from "./components/AppServerRail";
@@ -40,12 +47,38 @@ function RealtimeStatusBadge() {
 function AppPageShell() {
   const user = useAuthStore((state) => state.user);
   const [isCreateServerOpen, setIsCreateServerOpen] = useState(false);
+  const activeServerId = useServerRailStore((state) => state.activeServerId);
+  const extraServers = useServerRailStore((state) => state.extraServers);
+  const setActiveServerId = useServerRailStore((state) => state.setActiveServerId);
+
+  const ownedServersQuery = useQuery({
+    queryKey: ownedServersQueryKey,
+    queryFn: getOwnedServersRequest,
+    select: (response) => response.data,
+    enabled: Boolean(user),
+  });
+
+  const mergedServers = [...(ownedServersQuery.data ?? []), ...extraServers].reduce<ServerRecord[]>(
+    (accumulator, server) => {
+      if (accumulator.some((item) => item.id === server.id)) {
+        return accumulator;
+      }
+
+      return [...accumulator, server];
+    },
+    [],
+  );
 
   return (
     <RealtimeConnectionProvider>
       <main className="min-h-screen bg-[#202225] text-white">
         <div className="flex min-h-screen overflow-hidden pb-[104px] md:pb-0">
-          <AppServerRail onCreateServerClick={() => setIsCreateServerOpen(true)} />
+          <AppServerRail
+            servers={mergedServers}
+            activeServerId={activeServerId}
+            onCreateServerClick={() => setIsCreateServerOpen(true)}
+            onSelectServer={setActiveServerId}
+          />
           <AppSidebar />
 
           <div className="relative flex min-w-0 flex-1">
