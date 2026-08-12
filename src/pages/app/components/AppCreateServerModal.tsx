@@ -308,7 +308,7 @@ export function AppCreateServerModal({
               </div>
             </>
           ) : isCreateStep ? (
-            <form className="flex flex-1 flex-col" onSubmit={submitCreateServer}>
+            <form className="flex flex-1 min-h-0 flex-col" onSubmit={submitCreateServer}>
               <div className="px-6 pb-4 pt-6 sm:px-8 sm:pt-8">
                 <button
                   type="button"
@@ -327,7 +327,7 @@ export function AppCreateServerModal({
                 </p>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-6 pb-6 sm:px-8">
+              <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4 sm:px-8">
                 <div className="space-y-5">
                   <AuthField
                     label="Server Name"
@@ -375,19 +375,21 @@ export function AppCreateServerModal({
                       {formMessage}
                     </div>
                   ) : null}
-
-                  <button
-                    type="submit"
-                    disabled={createServerMutation.isPending}
-                    className="mb-1 w-full rounded-xl bg-gradient-to-r from-indigo-500 to-blue-500 px-4 py-3.5 text-base font-semibold text-white shadow-[0_18px_45px_rgba(79,70,229,0.35)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {createServerMutation.isPending ? 'Creating server...' : 'Create Server'}
-                  </button>
                 </div>
+              </div>
+
+              <div className="shrink-0 border-t border-white/[0.06] px-6 pb-6 pt-4 sm:px-8">
+                <button
+                  type="submit"
+                  disabled={createServerMutation.isPending}
+                  className="w-full rounded-xl bg-gradient-to-r from-indigo-500 to-blue-500 px-4 py-3.5 text-base font-semibold text-white shadow-[0_18px_45px_rgba(79,70,229,0.35)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {createServerMutation.isPending ? 'Creating server...' : 'Create Server'}
+                </button>
               </div>
             </form>
           ) : (
-            <form className="flex flex-1 flex-col" onSubmit={submitJoinServer}>
+            <form className="flex flex-1 min-h-0 flex-col" onSubmit={submitJoinServer}>
               <div className="px-6 pb-4 pt-6 sm:px-8 sm:pt-8">
                 <button
                   type="button"
@@ -406,7 +408,7 @@ export function AppCreateServerModal({
                 </p>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-6 pb-8 sm:px-8 sm:pb-10">
+              <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4 sm:px-8">
                 <div className="space-y-5">
                   <AuthField
                     label="Invite link / Server ID"
@@ -439,15 +441,17 @@ export function AppCreateServerModal({
                       {joinMessage}
                     </div>
                   ) : null}
-
-                  <button
-                    type="submit"
-                    disabled={joinServerMutation.isPending}
-                    className="w-full rounded-xl border border-indigo-400/40 bg-gradient-to-r from-indigo-500 to-blue-500 px-4 py-3.5 text-base font-semibold text-white shadow-[0_18px_45px_rgba(79,70,229,0.35)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {joinServerMutation.isPending ? 'Joining server...' : 'Join Server'}
-                  </button>
                 </div>
+              </div>
+
+              <div className="shrink-0 border-t border-white/[0.06] px-6 pb-6 pt-4 sm:px-8">
+                <button
+                  type="submit"
+                  disabled={joinServerMutation.isPending}
+                  className="w-full rounded-xl border border-indigo-400/40 bg-gradient-to-r from-indigo-500 to-blue-500 px-4 py-3.5 text-base font-semibold text-white shadow-[0_18px_45px_rgba(79,70,229,0.35)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {joinServerMutation.isPending ? 'Joining server...' : 'Join Server'}
+                </button>
               </div>
             </form>
           )}
