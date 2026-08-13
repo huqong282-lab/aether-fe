@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { LoginPage } from './pages/auth/LoginPage'
 import { RegisterPage } from './pages/auth/RegisterPage'
 import { AppPage } from './pages/app/AppPage'
+import { ServerWorkspacePage } from './pages/app/server/ServerWorkspacePage'
 import { UserSettingsPage } from './pages/settings/UserSettingsPage'
 import { useAuthStore } from './state/auth.state'
 
@@ -27,6 +28,22 @@ function App() {
         element={
           <ProtectedRoute>
             <AppPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/app/servers/:serverId"
+        element={
+          <ProtectedRoute>
+            <ServerWorkspacePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/app/servers/:serverId/channels/:channelId"
+        element={
+          <ProtectedRoute>
+            <ServerWorkspacePage />
           </ProtectedRoute>
         }
       />

@@ -9,6 +9,7 @@ import {
   joinServerRequest,
   ownedServersQueryKey,
 } from '../../../lib/server/server.api'
+import { createDefaultServerWorkspaceRequest } from '../../../lib/server/server-workspace.api'
 import { useServerRailStore } from '../../../state/server.state'
 
 type CreateServerTemplate = {
@@ -108,14 +109,22 @@ export function AppCreateServerModal({
   const createServerMutation = useMutation({
     mutationFn: async (payload: Parameters<typeof createServerRequest>[0]) => {
       const response = await createServerRequest(payload)
-      return response.data
+      const server = response.data
+
+      try {
+        await createDefaultServerWorkspaceRequest(server.id)
+      } catch (error) {
+        console.error('Gagal membuat default category/channel untuk server baru', error)
+      }
+
+      return server
     },
     onSuccess: async (server) => {
       upsertServer(server)
       setActiveServerId(server.id)
       await queryClient.invalidateQueries({ queryKey: ownedServersQueryKey })
       onClose()
-      navigate('/app', { replace: true })
+      navigate(`/app/servers/${server.id}`, { replace: true })
     },
     onError: (error) => {
       const normalized = normalizeApiError(error, 'Gagal membuat server')
@@ -180,7 +189,7 @@ export function AppCreateServerModal({
       setActiveServerId(server.id)
       await queryClient.invalidateQueries({ queryKey: ownedServersQueryKey })
       onClose()
-      navigate('/app', { replace: true })
+      navigate(`/app/servers/${server.id}`, { replace: true })
     },
     onError: (error) => {
       const normalized = normalizeApiError(error, 'Gagal bergabung ke server')
