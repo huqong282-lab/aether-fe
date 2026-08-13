@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../state/auth.state";
 import { useServerRailStore } from "../../state/server.state";
 import { RealtimeConnectionProvider, useRealtimeConnection } from "../../lib/websocket";
@@ -46,6 +47,7 @@ function RealtimeStatusBadge() {
 
 function AppPageShell() {
   const user = useAuthStore((state) => state.user);
+  const navigate = useNavigate();
   const [isCreateServerOpen, setIsCreateServerOpen] = useState(false);
   const activeServerId = useServerRailStore((state) => state.activeServerId);
   const extraServers = useServerRailStore((state) => state.extraServers);
@@ -77,7 +79,10 @@ function AppPageShell() {
             servers={mergedServers}
             activeServerId={activeServerId}
             onCreateServerClick={() => setIsCreateServerOpen(true)}
-            onSelectServer={setActiveServerId}
+            onSelectServer={(serverId) => {
+              setActiveServerId(serverId);
+              navigate(`/app/servers/${serverId}`, { replace: true });
+            }}
           />
           <AppSidebar />
 

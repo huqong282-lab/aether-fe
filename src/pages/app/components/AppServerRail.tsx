@@ -13,7 +13,10 @@ function ServerAvatar({ server }: { server: ServerRecord }) {
     )
   }
 
-  return <span>{server.name.trim().slice(0, 2).toUpperCase() || 'SV'}</span>
+  const compactName = server.name.replace(/\s+/g, '').trim()
+  const fallbackLabel = compactName.slice(-2).toUpperCase() || 'SV'
+
+  return <span>{fallbackLabel}</span>
 }
 
 export function AppServerRail({
