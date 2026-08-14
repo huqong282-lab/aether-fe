@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useChannelReadStore } from '../../../../state/channel.state'
 import type {
   ServerCategoryRecord,
@@ -6,6 +6,7 @@ import type {
   ServerWorkspaceRecord,
 } from '../../../../lib/server/server-workspace.api'
 import { AppUserPanel } from '../../components/AppUserPanel'
+import { SettingsIcon } from '../../app-icons'
 
 function TextChannelIcon() {
   return <span className="text-sm font-black leading-none">#</span>
@@ -136,17 +137,43 @@ export function ServerChannelSidebar({
   uncategorizedChannels,
   activeChannelId,
   onSelectChannel,
+  onServerSettingsClick,
 }: {
   workspace: ServerWorkspaceRecord
   categorizedChannels: Map<string, ServerChannelRecord[]>
   uncategorizedChannels: ServerChannelRecord[]
   activeChannelId: string | null
   onSelectChannel: (channelId: string) => void
+  onServerSettingsClick: () => void
 }) {
   const isChannelUnread = useChannelReadStore((state) => state.isChannelUnread)
   const [openCategoryIds, setOpenCategoryIds] = useState<Record<string, boolean>>({})
+  const [isServerMenuOpen, setIsServerMenuOpen] = useState(false)
+  const serverMenuRef = useRef<HTMLDivElement | null>(null)
 
   const categoryList = useMemo(() => [...workspace.categories], [workspace.categories])
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!serverMenuRef.current?.contains(event.target as Node)) {
+        setIsServerMenuOpen(false)
+      }
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsServerMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [])
 
   return (
     <aside className="hidden w-[320px] shrink-0 border-r border-white/[0.06] bg-[#2F3136] lg:flex lg:flex-col">
@@ -156,13 +183,42 @@ export function ServerChannelSidebar({
             <p className="truncate text-lg font-semibold text-white">{workspace.server.name}</p>
             <p className="text-sm text-slate-400">Category & channel tree</p>
           </div>
-          <button
-            type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.05] text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
-            aria-label="Server options"
-          >
-            ...
-          </button>
+          <div className="relative shrink-0" ref={serverMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsServerMenuOpen((current) => !current)}
+              className="flex items-center gap-2 rounded-full border border-white/80 bg-transparent px-3 py-2 text-slate-100 transition hover:bg-white/[0.06]"
+              aria-label="Server options"
+              aria-haspopup="menu"
+              aria-expanded={isServerMenuOpen}
+            >
+              <SettingsIcon className="h-4 w-4 shrink-0 text-slate-300" />
+              <span className="text-xs leading-none text-slate-400" aria-hidden="true">
+                {isServerMenuOpen ? '^' : 'v'}
+              </span>
+            </button>
+
+            {isServerMenuOpen ? (
+              <div
+                role="menu"
+                aria-label="Server options"
+                className="absolute right-0 top-full z-30 mt-2 w-64 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#2f3136] p-2 shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setIsServerMenuOpen(false)
+                    onServerSettingsClick()
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-100 transition hover:bg-white/[0.06]"
+                >
+                  <SettingsIcon className="h-4 w-4 shrink-0 text-slate-300" />
+                  <span>Server Settings</span>
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
