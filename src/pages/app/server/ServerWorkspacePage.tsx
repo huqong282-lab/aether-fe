@@ -198,6 +198,11 @@ export function ServerWorkspacePage() {
             markChannelRead(serverId, nextChannelId)
             navigate(`/app/servers/${serverId}/channels/${nextChannelId}`, { replace: true })
           }}
+          onServerSettingsClick={() => {
+            navigate(`/app/servers/${serverId}/settings`, {
+              state: { serverName: workspace.server.name },
+            })
+          }}
         />
 
         <div className="relative flex min-w-0 flex-1">

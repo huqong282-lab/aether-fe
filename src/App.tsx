@@ -4,6 +4,7 @@ import { LoginPage } from './pages/auth/LoginPage'
 import { RegisterPage } from './pages/auth/RegisterPage'
 import { AppPage } from './pages/app/AppPage'
 import { ServerWorkspacePage } from './pages/app/server/ServerWorkspacePage'
+import { ServerSettingsPage } from './pages/app/server/ServerSettingsPage'
 import { UserSettingsPage } from './pages/settings/UserSettingsPage'
 import { useAuthStore } from './state/auth.state'
 
@@ -44,6 +45,14 @@ function App() {
         element={
           <ProtectedRoute>
             <ServerWorkspacePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/app/servers/:serverId/settings"
+        element={
+          <ProtectedRoute>
+            <ServerSettingsPage />
           </ProtectedRoute>
         }
       />
