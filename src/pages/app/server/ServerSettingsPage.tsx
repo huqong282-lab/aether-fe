@@ -702,9 +702,6 @@ export function ServerSettingsPage() {
   const roleErrorMessage = rolesQuery.error
     ? normalizeApiError(rolesQuery.error, 'Gagal memuat roles.').message
     : null
-  const serverErrorMessage = serverQuery.error
-    ? normalizeApiError(serverQuery.error, 'Gagal memuat server.').message
-    : null
   const createErrorMessage = createRoleMutation.error
     ? normalizeApiError(createRoleMutation.error, 'Gagal membuat role.').message
     : null
