@@ -16,6 +16,13 @@ export type ChatAttachment = {
   sizeLabel: string
 }
 
+export type ChatReaction = {
+  emoji: string
+  count: number
+  users: string[]
+  reactedByCurrentUser?: boolean
+}
+
 export type ChatMessage = {
   id: string
   authorId: string
@@ -23,6 +30,8 @@ export type ChatMessage = {
   createdAt: string
   status: ChatStatus
   attachments?: ChatAttachment[]
+  reactions?: ChatReaction[]
+  isPinned?: boolean
 }
 
 export type ChatMessageGroup = {

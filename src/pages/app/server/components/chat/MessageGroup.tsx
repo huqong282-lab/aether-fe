@@ -36,10 +36,18 @@ function Avatar({ member }: { member: ChatMember }) {
 export function MessageGroup({
   group,
   members,
+  highlightedMessageId,
+  onJump,
+  onTogglePin,
+  onReact,
   onRetry,
 }: {
   group: ChatMessageGroup
   members: ChatMember[]
+  highlightedMessageId: string | null
+  onJump: (messageId: string) => void
+  onTogglePin: (messageId: string) => void
+  onReact: (messageId: string, emoji: string) => void
   onRetry: (messageId: string) => void
 }) {
   const member = members.find((item) => item.id === group.authorId) ?? members[0]
@@ -60,7 +68,17 @@ export function MessageGroup({
 
       <div className="space-y-3 pl-[52px]">
         {group.messages.map((message) => (
-          <MessageItem key={message.id} message={message} member={member} members={members} onRetry={onRetry} />
+          <MessageItem
+            key={message.id}
+            message={message}
+            member={member}
+            members={members}
+            isHighlighted={message.id === highlightedMessageId}
+            onJump={onJump}
+            onTogglePin={onTogglePin}
+            onReact={onReact}
+            onRetry={onRetry}
+          />
         ))}
       </div>
     </section>

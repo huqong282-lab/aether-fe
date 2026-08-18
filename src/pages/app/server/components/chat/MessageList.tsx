@@ -14,6 +14,10 @@ export function MessageList({
   members,
   hasOlderMessages,
   onLoadOlderMessages,
+  highlightedMessageId,
+  onJumpToMessage,
+  onTogglePin,
+  onReact,
   onRetryMessage,
 }: {
   scrollKey: string
@@ -21,6 +25,10 @@ export function MessageList({
   members: ChatMember[]
   hasOlderMessages: boolean
   onLoadOlderMessages: () => void
+  highlightedMessageId: string | null
+  onJumpToMessage: (messageId: string) => void
+  onTogglePin: (messageId: string) => void
+  onReact: (messageId: string, emoji: string) => void
   onRetryMessage: (messageId: string) => void
 }) {
   const listRef = useRef<HTMLDivElement | null>(null)
@@ -71,6 +79,15 @@ export function MessageList({
     previousMessageCountRef.current = messages.length
   }, [messages.length, scrollKey])
 
+  useLayoutEffect(() => {
+    if (!highlightedMessageId) {
+      return
+    }
+
+    const target = document.getElementById(`message-${highlightedMessageId}`)
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [highlightedMessageId, messages.length])
+
   return (
     <div
       ref={listRef}
@@ -118,6 +135,10 @@ export function MessageList({
             key={`${group.authorId}-${group.messages[0]?.id}`}
             group={group}
             members={members}
+            highlightedMessageId={highlightedMessageId}
+            onJump={onJumpToMessage}
+            onTogglePin={onTogglePin}
+            onReact={onReact}
             onRetry={onRetryMessage}
           />
         ))}
