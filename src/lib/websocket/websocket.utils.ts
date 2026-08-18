@@ -57,7 +57,12 @@ export function parseRealtimeEnvelope(rawData: unknown): RealtimeEnvelope {
   try {
     const parsed = JSON.parse(rawData);
     if (isPlainObject(parsed)) {
-      const type = typeof parsed.type === "string" && parsed.type.length > 0 ? parsed.type : "message";
+      const type =
+        typeof parsed.type === "string" && parsed.type.length > 0
+          ? parsed.type
+          : typeof parsed.event === "string" && parsed.event.length > 0
+            ? parsed.event
+            : "message";
       return {
         type,
         ...parsed,

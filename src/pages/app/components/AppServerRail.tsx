@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { AddIcon, CompassIcon, DownloadIcon, HomeIcon } from '../app-icons'
 import logoImage from '../../../assets/aetherLg.png'
 import type { ServerRecord } from '../../../lib/server/server.api'
@@ -33,9 +34,14 @@ export function AppServerRail({
   return (
     <aside className="hidden w-[76px] shrink-0 border-r border-white/[0.06] bg-[#202225] px-3 py-4 md:flex md:flex-col">
       <div className="flex flex-col items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-[#5865F2] shadow-[0_12px_30px_rgba(88,101,242,0.4)]">
+        <Link
+          to="/app"
+          className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-[#5865F2] shadow-[0_12px_30px_rgba(88,101,242,0.4)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(88,101,242,0.5)]"
+          aria-label="Back to Aether home"
+          title="Aether Home"
+        >
           <img src={logoImage} alt="Aether" className="h-full w-full object-cover" />
-        </div>
+        </Link>
         <div className="h-px w-8 bg-white/10" />
         <div className="flex flex-col gap-3">
           <button
@@ -52,21 +58,25 @@ export function AppServerRail({
                 const isActive = server.id === activeServerId
 
                 return (
-                  <button
-                    key={server.id}
-                    type="button"
-                    onClick={() => onSelectServer(server.id)}
-                    className={[
-                      'flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border text-[11px] font-bold uppercase tracking-wide transition',
-                      isActive
-                        ? 'border-[#5865F2] bg-[#5865F2] text-white shadow-[0_12px_30px_rgba(88,101,242,0.38)]'
-                        : 'border-white/[0.06] bg-white/5 text-white/80 hover:-translate-y-0.5 hover:border-white/15 hover:bg-white/10 hover:text-white',
-                    ].join(' ')}
-                    aria-label={server.name}
-                    title={server.name}
-                  >
-                    <ServerAvatar server={server} />
-                  </button>
+                  <div key={server.id} className="relative group">
+                    <button
+                      type="button"
+                      onClick={() => onSelectServer(server.id)}
+                      className={[
+                        'flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border text-[11px] font-bold uppercase tracking-wide transition',
+                        isActive
+                          ? 'border-[#5865F2] bg-[#5865F2] text-white shadow-[0_12px_30px_rgba(88,101,242,0.38)]'
+                          : 'border-white/[0.06] bg-white/5 text-white/80 hover:-translate-y-0.5 hover:border-white/15 hover:bg-white/10 hover:text-white',
+                      ].join(' ')}
+                      aria-label={server.name}
+                    >
+                      <ServerAvatar server={server} />
+                    </button>
+
+                    <div className="pointer-events-none absolute left-full top-1/2 z-20 ml-3 -translate-y-1/2 whitespace-nowrap rounded-xl border border-white/[0.08] bg-[#111214] px-3 py-1.5 text-sm font-semibold text-white opacity-0 shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition group-hover:opacity-100">
+                      {server.name}
+                    </div>
+                  </div>
                 )
               })}
             </div>

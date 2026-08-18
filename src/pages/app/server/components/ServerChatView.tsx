@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../../../../state/auth.state'
 import type { ServerChannelRecord, ServerWorkspaceRecord } from '../../../../lib/server/server-workspace.api'
+import { getServerMembersRequest, type ServerMemberMentionRecord } from '../../../../lib/server/server-members.api'
 import {
   addMessageReactionRequest,
   createChannelMessageRequest,
@@ -13,6 +14,7 @@ import {
   type ReactionRecord,
   unpinMessageRequest,
 } from '../../../../lib/message/message.api'
+import { useRealtimeConnection } from '../../../../lib/websocket'
 import {
   createChatMembers,
   createId,
@@ -50,6 +52,88 @@ function mapMessageRecordToChatMessage(
 
 function sortMessagesByCreatedAt(messages: ChatMessage[]) {
   return [...messages].sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt))
+}
+
+function getPresenceToneClass(state: ChatMember['presence']) {
+  return {
+    online: 'bg-[#3BA55D]',
+    idle: 'bg-[#FAA61A]',
+    dnd: 'bg-[#ED4245]',
+    offline: 'bg-[#747F8D]',
+  }[state]
+}
+
+function getPresenceLabel(state: ChatMember['presence']) {
+  return {
+    online: 'Online',
+    idle: 'Idle / AFK',
+    dnd: 'Do Not Disturb',
+    offline: 'Offline',
+  }[state]
+}
+
+function createMemberAccent(name: string) {
+  const accents = [
+    'from-fuchsia-500 to-rose-500',
+    'from-sky-400 to-cyan-500',
+    'from-emerald-400 to-teal-500',
+    'from-violet-400 to-indigo-500',
+    'from-amber-400 to-orange-500',
+    'from-rose-400 to-pink-500',
+    'from-cyan-400 to-blue-500',
+  ]
+
+  const normalized = name.trim().toLowerCase()
+  const hash = [...normalized].reduce((accumulator, character) => accumulator + character.charCodeAt(0), 0)
+  return accents[hash % accents.length]
+}
+
+type ServerMemberView = {
+  id: string
+  displayName: string
+  username: string
+  avatarUrl: string | null
+  presence: ChatMember['presence']
+  accent: string
+}
+
+function mapServerMemberToView(member: ServerMemberMentionRecord): ServerMemberView {
+  const displayName = member.displayName?.trim() || member.username?.trim() || 'Member'
+  const username = member.username?.trim() || displayName.toLowerCase().replace(/\s+/g, '')
+  const presence = member.presence ?? 'offline'
+
+  return {
+    id: member.id,
+    displayName,
+    username,
+    avatarUrl: member.avatarUrl,
+    presence,
+    accent: createMemberAccent(displayName),
+  }
+}
+
+function groupMembersByPresence(members: ServerMemberView[]) {
+  const orderedStatuses: ChatMember['presence'][] = ['online', 'idle', 'dnd', 'offline']
+  const grouped = new Map<ChatMember['presence'], ServerMemberView[]>()
+
+  for (const status of orderedStatuses) {
+    grouped.set(status, [])
+  }
+
+  for (const member of members) {
+    const next = grouped.get(member.presence) ?? []
+    next.push(member)
+    grouped.set(member.presence, next)
+  }
+
+  return orderedStatuses
+    .map((status) => ({
+      status,
+      members: (grouped.get(status) ?? []).sort((left, right) =>
+        left.displayName.localeCompare(right.displayName, 'id-ID'),
+      ),
+    }))
+    .filter((group) => group.members.length > 0)
 }
 
 function mapReactionRecordsToChatReactions(records: ReactionRecord[], currentUserId: string | null) {
@@ -224,6 +308,119 @@ function PinnedMessagesPanel({
   )
 }
 
+function MemberAvatar({ member }: { member: ServerMemberView }) {
+  const initials = member.displayName
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+
+  return (
+    <div className="relative h-10 w-10 shrink-0">
+      {member.avatarUrl ? (
+        <img
+          src={member.avatarUrl}
+          alt={member.displayName}
+          className="h-10 w-10 rounded-full object-cover"
+        />
+      ) : (
+        <div
+          className={[
+            'flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br text-xs font-bold text-white',
+            member.accent,
+          ].join(' ')}
+        >
+          {initials}
+        </div>
+      )}
+      <span
+        className={[
+          'absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-[#2b2d31]',
+          getPresenceToneClass(member.presence),
+        ].join(' ')}
+        aria-hidden="true"
+      />
+    </div>
+  )
+}
+
+function MemberListPanel({ members }: { members: ServerMemberView[] }) {
+  const groupedMembers = groupMembersByPresence(members)
+
+  return (
+    <aside className="hidden w-[300px] shrink-0 border-l border-white/[0.06] bg-[#2b2d31] px-4 py-4 xl:flex xl:flex-col">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-white">Members</p>
+          <p className="text-xs text-slate-400">{members.length} anggota server</p>
+        </div>
+        <div className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-300">
+          Live
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+        {groupedMembers.map((group) => (
+          <section key={group.status}>
+            <div className="mb-2 flex items-center justify-between px-1">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                {getPresenceLabel(group.status)}
+              </p>
+              <span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold text-slate-300">
+                {group.members.length}
+              </span>
+            </div>
+
+            <div className="space-y-1">
+              {group.members.map((member) => (
+                <div
+                  key={member.id}
+                  className="flex items-center gap-3 rounded-2xl px-2 py-2 transition hover:bg-white/[0.05]"
+                >
+                  <MemberAvatar member={member} />
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-semibold text-white">{member.displayName}</p>
+                      <span className="truncate text-xs text-slate-500">@{member.username}</span>
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      <span className={['h-2 w-2 rounded-full', getPresenceToneClass(member.presence)].join(' ')} />
+                      <span className="text-xs text-slate-400">{getPresenceLabel(member.presence)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </aside>
+  )
+}
+
+function MemberListIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+      <path
+        d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8 0a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3.5 18.5c.9-2.6 3-4 5.5-4s4.6 1.4 5.5 4m2.5-1.5c.5-1.7 1.8-2.8 3.5-3"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 function mapChannelSnapshot(
   workspace: ServerWorkspaceRecord,
   channel: ServerChannelRecord,
@@ -248,11 +445,14 @@ export function ServerChatView({
   activeChannel: ServerChannelRecord
 }) {
   const currentUser = useAuthStore((state) => state.user)
+  const realtime = useRealtimeConnection()
   const snapshotStoreRef = useRef<Record<string, ChannelChatSnapshot>>({})
   const jumpResetTimeoutRef = useRef<number | null>(null)
   const [version, setVersion] = useState(0)
   const [pinnedPanelOpen, setPinnedPanelOpen] = useState(false)
+  const [memberListOpen, setMemberListOpen] = useState(true)
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null)
+  const [presenceOverrides, setPresenceOverrides] = useState<Record<string, ChatMember['presence']>>({})
 
   const members = useMemo(
     () => createChatMembers(workspace.server.id, workspace.server.name, currentUser),
@@ -270,6 +470,103 @@ export function ServerChatView({
     },
     enabled: Boolean(activeChannel.id),
   })
+
+  const serverMembersQuery = useQuery({
+    queryKey: ['server-members', workspace.server.id],
+    queryFn: async () => {
+      const response = await getServerMembersRequest(workspace.server.id)
+      return response.data
+    },
+    enabled: Boolean(workspace.server.id),
+    refetchInterval: 15_000,
+  })
+
+  useEffect(() => {
+    const latestMessage = realtime.latestMessage
+
+    if (!latestMessage || latestMessage.type !== 'presence.updated') {
+      return
+    }
+
+    const payload = (() => {
+      if (latestMessage.payload && typeof latestMessage.payload === 'object' && !Array.isArray(latestMessage.payload)) {
+        return latestMessage.payload as { userId?: string; status?: ChatMember['presence'] }
+      }
+
+      if (typeof latestMessage.data === 'object' && latestMessage.data !== null && !Array.isArray(latestMessage.data)) {
+        return latestMessage.data as { userId?: string; status?: ChatMember['presence'] }
+      }
+
+      return null
+    })()
+
+    if (!payload?.userId || !payload.status) {
+      return
+    }
+
+    setPresenceOverrides((current) => {
+      const nextPresence = payload.status === 'online' || payload.status === 'idle' || payload.status === 'dnd'
+        ? payload.status
+        : 'offline'
+
+      if (current[payload.userId] === nextPresence) {
+        return current
+      }
+
+      return {
+        ...current,
+        [payload.userId]: nextPresence,
+      }
+    })
+  }, [realtime.latestMessage])
+
+  const serverMembers = useMemo(() => {
+    const membersFromServer = serverMembersQuery.data ?? []
+
+    return membersFromServer
+      .map((member) => {
+        const mappedMember = mapServerMemberToView(member)
+        const overriddenPresence = presenceOverrides[member.userId]
+
+        return overriddenPresence
+          ? {
+              ...mappedMember,
+              presence: overriddenPresence,
+            }
+          : mappedMember
+      })
+      .sort((left, right) => {
+        const presenceOrder: Record<ChatMember['presence'], number> = {
+          online: 0,
+          idle: 1,
+          dnd: 2,
+          offline: 3,
+        }
+
+        const presenceDelta = presenceOrder[left.presence] - presenceOrder[right.presence]
+        if (presenceDelta !== 0) {
+          return presenceDelta
+        }
+
+        return left.displayName.localeCompare(right.displayName, 'id-ID')
+      })
+  }, [presenceOverrides, serverMembersQuery.data])
+
+  const fallbackOwnerMember = useMemo(() => {
+    const ownerMember = members.find((member) => member.id === `${workspace.server.id}-owner`) ?? members[0]
+
+    return {
+      id: ownerMember.id,
+      displayName: ownerMember.name,
+      username: ownerMember.handle,
+      avatarUrl: null,
+      presence: ownerMember.presence,
+      accent: ownerMember.accent,
+    } satisfies ServerMemberView
+  }, [members, workspace.server.id])
+
+  const memberListMembers = serverMembers.length > 0 ? serverMembers : [fallbackOwnerMember]
+  const showMemberList = memberListOpen
 
   const snapshot = snapshotStoreRef.current[channelKey] ?? mapChannelSnapshot(
     workspace,
@@ -749,6 +1046,21 @@ export function ServerChatView({
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={() => setMemberListOpen((current) => !current)}
+            className={[
+              'group inline-flex h-10 w-10 items-center justify-center rounded-full border transition',
+              memberListOpen
+                ? 'border-white/[0.08] bg-white/[0.08] text-white hover:bg-white/[0.12]'
+                : 'border-white/[0.08] bg-white/[0.04] text-slate-300 hover:bg-white/[0.08] hover:text-white',
+            ].join(' ')}
+            aria-label={memberListOpen ? 'Hide member list' : 'Show member list'}
+            title={memberListOpen ? 'Hide Member List' : 'Show Member List'}
+          >
+            <MemberListIcon />
+          </button>
+
+          <button
+            type="button"
             onClick={() => setPinnedPanelOpen((current) => !current)}
             className={[
               'relative inline-flex h-10 w-10 items-center justify-center rounded-full border transition',
@@ -776,42 +1088,46 @@ export function ServerChatView({
         />
       ) : null}
 
-      <div className="flex min-h-0 flex-1 flex-col px-4 py-4 lg:px-6">
-        <div className="mb-4 rounded-[28px] border border-white/[0.06] bg-[linear-gradient(135deg,rgba(88,101,242,0.18),rgba(0,0,0,0.08))] px-5 py-4">
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-400">ChatView</p>
-          <p className="mt-2 text-sm leading-6 text-slate-300">
-            MessageList mengelompokkan pesan dari user yang sama, composer mendukung mention popup, dan
-            scroll ke atas memuat history lama tanpa menggeser posisi baca.
-          </p>
-        </div>
+      <div className="flex min-h-0 flex-1 overflow-hidden px-4 py-4 lg:px-6">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="mb-4 rounded-[28px] border border-white/[0.06] bg-[linear-gradient(135deg,rgba(88,101,242,0.18),rgba(0,0,0,0.08))] px-5 py-4">
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-400">ChatView</p>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              MessageList mengelompokkan pesan dari user yang sama, composer mendukung mention popup, dan
+              scroll ke atas memuat history lama tanpa menggeser posisi baca.
+            </p>
+          </div>
 
-        <MessageList
-          scrollKey={channelKey}
-          messages={visibleMessages}
-          members={members}
-          hasOlderMessages={hasOlderMessages}
-          onLoadOlderMessages={handleLoadOlderMessages}
-          highlightedMessageId={highlightedMessageId}
-          onJumpToMessage={handleJumpToMessage}
-          onTogglePin={handleTogglePin}
-          onReact={handleReactToMessage}
-          onRetryMessage={handleRetry}
-        />
-
-        <div className="mt-4">
-          <MessageComposer
-            draft={snapshot.draft}
-            attachments={snapshot.attachments}
+          <MessageList
+            scrollKey={channelKey}
+            messages={visibleMessages}
             members={members}
-            mentionRange={mentionRange}
-            mentionQuery={mentionQuery}
-            onDraftChange={handleDraftChange}
-            onSubmit={handleSend}
-            onAttachFiles={handleAttachFiles}
-            onPickMention={handlePickMention}
-            onRemoveAttachment={handleRemoveAttachment}
+            hasOlderMessages={hasOlderMessages}
+            onLoadOlderMessages={handleLoadOlderMessages}
+            highlightedMessageId={highlightedMessageId}
+            onJumpToMessage={handleJumpToMessage}
+            onTogglePin={handleTogglePin}
+            onReact={handleReactToMessage}
+            onRetryMessage={handleRetry}
           />
+
+          <div className="mt-4">
+            <MessageComposer
+              draft={snapshot.draft}
+              attachments={snapshot.attachments}
+              members={members}
+              mentionRange={mentionRange}
+              mentionQuery={mentionQuery}
+              onDraftChange={handleDraftChange}
+              onSubmit={handleSend}
+              onAttachFiles={handleAttachFiles}
+              onPickMention={handlePickMention}
+              onRemoveAttachment={handleRemoveAttachment}
+            />
+          </div>
         </div>
+
+        {showMemberList ? <MemberListPanel members={memberListMembers} /> : null}
       </div>
     </section>
   )

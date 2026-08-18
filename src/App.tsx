@@ -6,6 +6,7 @@ import { AppPage } from './pages/app/AppPage'
 import { ServerWorkspacePage } from './pages/app/server/ServerWorkspacePage'
 import { ServerSettingsPage } from './pages/app/server/ServerSettingsPage'
 import { UserSettingsPage } from './pages/settings/UserSettingsPage'
+import { RealtimeConnectionProvider } from './lib/websocket'
 import { useAuthStore } from './state/auth.state'
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -18,6 +19,14 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return children
 }
 
+function ProtectedRealtimeRoute({ children }: { children: ReactNode }) {
+  return (
+    <ProtectedRoute>
+      <RealtimeConnectionProvider>{children}</RealtimeConnectionProvider>
+    </ProtectedRoute>
+  )
+}
+
 function App() {
   return (
     <Routes>
@@ -27,41 +36,41 @@ function App() {
       <Route
         path="/app"
         element={
-          <ProtectedRoute>
+          <ProtectedRealtimeRoute>
             <AppPage />
-          </ProtectedRoute>
+          </ProtectedRealtimeRoute>
         }
       />
       <Route
         path="/app/servers/:serverId"
         element={
-          <ProtectedRoute>
+          <ProtectedRealtimeRoute>
             <ServerWorkspacePage />
-          </ProtectedRoute>
+          </ProtectedRealtimeRoute>
         }
       />
       <Route
         path="/app/servers/:serverId/channels/:channelId"
         element={
-          <ProtectedRoute>
+          <ProtectedRealtimeRoute>
             <ServerWorkspacePage />
-          </ProtectedRoute>
+          </ProtectedRealtimeRoute>
         }
       />
       <Route
         path="/app/servers/:serverId/settings"
         element={
-          <ProtectedRoute>
+          <ProtectedRealtimeRoute>
             <ServerSettingsPage />
-          </ProtectedRoute>
+          </ProtectedRealtimeRoute>
         }
       />
       <Route
         path="/app/settings"
         element={
-          <ProtectedRoute>
+          <ProtectedRealtimeRoute>
             <UserSettingsPage />
-          </ProtectedRoute>
+          </ProtectedRealtimeRoute>
         }
       />
       <Route path="*" element={<Navigate to="/login" replace />} />
