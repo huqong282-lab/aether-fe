@@ -84,6 +84,18 @@ export type MessageThreadResponse = {
   }
 }
 
+export type ReactionRecord = {
+  id: string
+  messageId: string
+  userId: string
+  emoji: string
+  createdAt: string
+}
+
+export type ReactionListResponse = {
+  data: ReactionRecord[]
+}
+
 export async function getChannelMessagesRequest(
   channelId: string,
   params?: {
@@ -126,6 +138,23 @@ export async function unpinMessageRequest(messageId: string) {
 export async function getMessageThreadRequest(messageId: string) {
   const response = await apiClient.get(`/message/${messageId}/thread`)
   return response.data as MessageThreadResponse
+}
+
+export async function getMessageReactionsRequest(messageId: string) {
+  const response = await apiClient.get(`/message/${messageId}/reactions`)
+  return response.data as ReactionListResponse
+}
+
+export async function addMessageReactionRequest(messageId: string, emoji: string) {
+  const response = await apiClient.post(`/message/${messageId}/reactions`, { emoji })
+  return response.data as { data: ReactionRecord }
+}
+
+export async function removeMessageReactionRequest(messageId: string, emoji: string) {
+  const response = await apiClient.delete(`/message/${messageId}/reactions`, {
+    data: { emoji },
+  })
+  return response.data as { success?: boolean; message?: string }
 }
 
 export async function searchMessagesRequest(params: {

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ChatMember, ChatMessage } from './chat.types'
 import { formatMessageTime, getPresenceTone } from './chat.utils'
 
@@ -42,6 +42,36 @@ function RetryIcon() {
       <path d="M20 7v5h-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
+}
+
+function PinIcon({ filled = false }: { filled?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} className="h-4 w-4" aria-hidden="true">
+      <path
+        d="M14.5 3l6.5 6.5-2.3 2.3-1.2-.4-2.6 2.6v3.1l-1.3 1.3-2.6-2.6-4.2 4.2-1.6-1.6 4.2-4.2-2.6-2.6 1.3-1.3h3.1l2.6-2.6-.4-1.2L14.5 3z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function SparkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path
+        d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function EmojiButton({ emoji }: { emoji: string }) {
+  return <span aria-hidden="true">{emoji}</span>
 }
 
 function statusTone(status: ChatMessage['status']) {
@@ -100,20 +130,134 @@ export function MessageItem({
   message,
   member,
   members,
+  isHighlighted,
+  onJump,
+  onTogglePin,
+  onReact,
   onRetry,
 }: {
   message: ChatMessage
   member: ChatMember
   members: ChatMember[]
+  isHighlighted?: boolean
+  onJump: (messageId: string) => void
+  onTogglePin: (messageId: string) => void
+  onReact: (messageId: string, emoji: string) => void
   onRetry: (messageId: string) => void
 }) {
+  const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
+  const containerRef = useRef<HTMLElement | null>(null)
+  const quickReactions = ['👍', '❤️', '😂', '🔥']
+  const fullReactions = ['👍', '❤️', '😂', '🔥', '🎉', '👀', '✨', '😮', '🙏', '✅', '💡', '🫶']
+
+  useEffect(() => {
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (!containerRef.current) {
+        return
+      }
+
+      if (event.target instanceof Node && !containerRef.current.contains(event.target)) {
+        setReactionPickerOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleDocumentClick)
+    return () => document.removeEventListener('mousedown', handleDocumentClick)
+  }, [])
+
   return (
-    <article className="group rounded-2xl border border-white/[0.05] bg-white/[0.03] px-4 py-3 transition hover:bg-white/[0.05]">
+    <article
+      ref={containerRef}
+      id={`message-${message.id}`}
+      className={[
+        'group relative scroll-mt-6 rounded-2xl border px-4 py-3 transition',
+        isHighlighted
+          ? 'border-[#5865F2]/50 bg-[#5865F2]/14 shadow-[0_0_0_1px_rgba(88,101,242,0.32),0_12px_40px_rgba(0,0,0,0.16)]'
+          : 'border-white/[0.05] bg-white/[0.03] hover:bg-white/[0.05]',
+      ].join(' ')}
+    >
+      {message.isPinned ? (
+        <button
+          type="button"
+          onClick={() => onJump(message.id)}
+          className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full border border-[#5865F2]/30 bg-[#5865F2]/18 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d8ddff] opacity-0 transition hover:bg-[#5865F2]/28 group-hover:opacity-100"
+        >
+          <SparkIcon />
+          Jump
+        </button>
+      ) : null}
+
+      <div className="absolute right-3 top-3 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setReactionPickerOpen((current) => !current)}
+            className="grid h-8 w-8 place-items-center rounded-full border border-white/10 bg-[#1f2125] text-sm text-slate-100 transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-[#2a2d33]"
+            aria-label="Open reaction picker"
+            aria-expanded={reactionPickerOpen}
+          >
+            <EmojiButton emoji="😊" />
+          </button>
+
+          {reactionPickerOpen ? (
+            <div className="absolute right-0 top-10 z-20 w-64 rounded-2xl border border-white/[0.08] bg-[#2b2d31] p-3 shadow-[0_24px_60px_rgba(0,0,0,0.45)]">
+              <div className="grid grid-cols-4 gap-2">
+                {quickReactions.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => {
+                      onReact(message.id, emoji)
+                      setReactionPickerOpen(false)
+                    }}
+                    className="grid h-10 w-10 place-items-center rounded-xl border border-white/[0.06] bg-white/[0.04] text-lg transition hover:-translate-y-0.5 hover:bg-white/[0.08]"
+                    aria-label={`React with ${emoji}`}
+                  >
+                    <EmojiButton emoji={emoji} />
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-3 grid grid-cols-6 gap-2">
+                {fullReactions.map((emoji) => (
+                  <button
+                    key={`${message.id}-${emoji}`}
+                    type="button"
+                    onClick={() => {
+                      onReact(message.id, emoji)
+                      setReactionPickerOpen(false)
+                    }}
+                    className="grid h-9 w-9 place-items-center rounded-lg border border-white/[0.06] bg-[#202225] text-base transition hover:-translate-y-0.5 hover:bg-white/[0.08]"
+                    aria-label={`React with ${emoji}`}
+                  >
+                    <EmojiButton emoji={emoji} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onTogglePin(message.id)}
+          className={[
+            'grid h-8 w-8 place-items-center rounded-full border text-sm transition hover:-translate-y-0.5',
+            message.isPinned
+              ? 'border-[#5865F2]/30 bg-[#5865F2]/20 text-[#d8ddff] hover:bg-[#5865F2]/30'
+              : 'border-white/10 bg-[#1f2125] text-slate-200 hover:border-white/20 hover:bg-[#2a2d33]',
+          ].join(' ')}
+          aria-label={message.isPinned ? 'Unpin message' : 'Pin message'}
+        >
+          <PinIcon filled={Boolean(message.isPinned)} />
+        </button>
+      </div>
+
       <div className="flex items-start gap-3">
         <Avatar member={member} />
 
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 pr-24">
             <span className="text-sm font-semibold text-white">{member.name}</span>
             <span className="text-xs text-slate-500">@{member.handle}</span>
             <span className="text-xs text-slate-500">{formatMessageTime(message.createdAt)}</span>
@@ -145,6 +289,28 @@ export function MessageItem({
             </div>
           ) : null}
 
+          {message.reactions && message.reactions.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {message.reactions.map((reaction) => (
+                <button
+                  key={`${message.id}-${reaction.emoji}`}
+                  type="button"
+                  onClick={() => onReact(message.id, reaction.emoji)}
+                  title={reaction.users.join(', ')}
+                  className={[
+                    'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition',
+                    reaction.reactedByCurrentUser
+                      ? 'border-[#5865F2]/45 bg-[#5865F2]/16 text-[#dde2ff]'
+                      : 'border-white/[0.08] bg-[#202225] text-slate-200 hover:border-white/[0.14] hover:bg-[#2b2f36]',
+                  ].join(' ')}
+                >
+                  <span aria-hidden="true">{reaction.emoji}</span>
+                  <span>{reaction.count}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+
           {message.status === 'failed' ? (
             <div className="mt-3 flex items-center gap-3">
               <span className="text-xs text-rose-200">Gagal terkirim. Coba kirim ulang dari UI.</span>
@@ -163,4 +329,3 @@ export function MessageItem({
     </article>
   )
 }
-

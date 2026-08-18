@@ -18,6 +18,16 @@ export function formatMessageTime(isoDate: string) {
   }).format(new Date(isoDate))
 }
 
+export function formatLongMessageTime(isoDate: string) {
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(isoDate))
+}
+
 export function formatFileSize(bytes: number) {
   if (bytes < 1024) {
     return `${bytes} B`
@@ -148,11 +158,18 @@ export function createSeedMessages(
       authorId: pickAuthor(1),
       content: `Selamat datang di ${baseLabel}. Kita bisa pakai thread ini untuk cek FE6.1.`,
       status: 'sent',
+      reactions: [
+        { emoji: '👀', count: 2, users: ['Raka', 'Dita'] },
+      ],
     },
     {
       authorId: pickAuthor(2),
       content: 'MessageList perlu infinite scroll yang tetap menjaga posisi saat pesan lama dimuat.',
       status: 'sent',
+      isPinned: true,
+      reactions: [
+        { emoji: '🔥', count: 3, users: ['Fajar', 'Nadia', 'You'] },
+      ],
     },
     {
       authorId: pickAuthor(2),
@@ -168,6 +185,9 @@ export function createSeedMessages(
       authorId: currentUserId,
       content: 'Aku sedang cek optimistic send, status sent/failed, dan retry dari UI.',
       status: 'sent',
+      reactions: [
+        { emoji: '✅', count: 1, users: ['Raka'] },
+      ],
     },
     {
       authorId: pickAuthor(4),
@@ -193,6 +213,7 @@ export function createSeedMessages(
       authorId: pickAuthor(1),
       content: 'Dan jangan lupa composer auto-resize supaya input panjang tetap nyaman.',
       status: 'sent',
+      isPinned: true,
     },
     {
       authorId: currentUserId,
@@ -211,6 +232,8 @@ export function createSeedMessages(
     authorId: seed.authorId,
     content: seed.content,
     status: seed.status,
+    reactions: seed.reactions,
+    isPinned: seed.isPinned,
     createdAt: new Date(now - (seeds.length - index) * 4 * 60 * 1000).toISOString(),
   }))
 }
