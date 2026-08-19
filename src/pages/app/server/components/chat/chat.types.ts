@@ -44,5 +44,6 @@ export type ChannelChatSnapshot = {
   draft: string
   attachments: ChatAttachment[]
   visibleCount: number
+  lastReadMessageId: string | null
 }
 

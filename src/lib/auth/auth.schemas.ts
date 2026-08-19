@@ -29,6 +29,19 @@ export const registerFormSchema = z
     message: 'Password dan konfirmasi password tidak sama',
   })
 
+export const verifyEmailFormSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, 'Email wajib diisi')
+    .email('Format email tidak valid'),
+  code: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, 'Kode verifikasi harus terdiri dari 6 digit'),
+})
+
 export type LoginFormValues = z.infer<typeof loginFormSchema>
 export type RegisterFormValues = z.infer<typeof registerFormSchema>
+export type VerifyEmailFormValues = z.infer<typeof verifyEmailFormSchema>
 

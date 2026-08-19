@@ -37,6 +37,7 @@ export function MessageGroup({
   group,
   members,
   highlightedMessageId,
+  readReceiptMessageId,
   onJump,
   onTogglePin,
   onReact,
@@ -45,6 +46,7 @@ export function MessageGroup({
   group: ChatMessageGroup
   members: ChatMember[]
   highlightedMessageId: string | null
+  readReceiptMessageId: string | null
   onJump: (messageId: string) => void
   onTogglePin: (messageId: string) => void
   onReact: (messageId: string, emoji: string) => void
@@ -74,6 +76,7 @@ export function MessageGroup({
             member={member}
             members={members}
             isHighlighted={message.id === highlightedMessageId}
+            readReceiptMessageId={readReceiptMessageId}
             onJump={onJump}
             onTogglePin={onTogglePin}
             onReact={onReact}

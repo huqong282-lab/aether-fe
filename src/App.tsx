@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { LoginPage } from './pages/auth/LoginPage'
 import { RegisterPage } from './pages/auth/RegisterPage'
+import { VerifyEmailPage } from './pages/auth/VerifyEmailPage'
 import { AppPage } from './pages/app/AppPage'
 import { ServerWorkspacePage } from './pages/app/server/ServerWorkspacePage'
 import { ServerSettingsPage } from './pages/app/server/ServerSettingsPage'
@@ -33,6 +34,7 @@ function App() {
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route
         path="/app"
         element={
