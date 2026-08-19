@@ -107,6 +107,18 @@ export function useAuthPage(mode: AuthMode) {
         'Gagal login. Coba lagi nanti.',
         'Email atau password salah.',
       )
+
+      if (normalized.message?.toLowerCase().includes('email belum diverifikasi')) {
+        navigate('/verify-email', {
+          replace: true,
+          state: {
+            email: loginValues.email,
+            notice: normalized.message,
+          },
+        })
+        return
+      }
+
       setLoginServerMessage(normalized.message)
       setLoginServerErrors(normalized.fieldErrors)
     },
@@ -115,11 +127,11 @@ export function useAuthPage(mode: AuthMode) {
   const registerMutation = useMutation({
     mutationFn: registerRequest,
     onSuccess: () => {
-      navigate('/login', {
+      navigate('/verify-email', {
         replace: true,
         state: {
           email: registerValues.email,
-          notice: 'Registrasi berhasil. Silakan login.',
+          notice: 'Registrasi berhasil. Silakan cek email untuk kode verifikasi.',
         },
       })
     },

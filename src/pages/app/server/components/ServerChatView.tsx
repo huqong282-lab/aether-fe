@@ -14,11 +14,14 @@ import {
   type ReactionRecord,
   unpinMessageRequest,
 } from '../../../../lib/message/message.api'
+import {
+  getChannelReadReceiptRequest,
+  updateChannelReadReceiptRequest,
+} from '../../../../lib/message/read-receipt.api'
 import { useRealtimeConnection } from '../../../../lib/websocket'
 import {
   createChatMembers,
   createId,
-  createSeedMessages,
   DEFAULT_VISIBLE_MESSAGE_COUNT,
   formatFileSize,
   formatLongMessageTime,
@@ -422,19 +425,53 @@ function MemberListIcon() {
 }
 
 function mapChannelSnapshot(
-  workspace: ServerWorkspaceRecord,
-  channel: ServerChannelRecord,
-  members: ChatMember[],
-  currentUserId: string,
+  _workspace: ServerWorkspaceRecord,
+  _channel: ServerChannelRecord,
+  _members: ChatMember[],
 ): ChannelChatSnapshot {
-  const seedMessages = createSeedMessages(channel.id, workspace.server.name, channel.name, members, currentUserId)
-
   return {
-    messages: seedMessages,
+    messages: [],
     draft: '',
     attachments: [],
-    visibleCount: Math.min(DEFAULT_VISIBLE_MESSAGE_COUNT, seedMessages.length),
+    visibleCount: DEFAULT_VISIBLE_MESSAGE_COUNT,
+    lastReadMessageId: null,
   }
+}
+
+const TYPING_HEARTBEAT_MS = 2500
+
+function getEnvelopeObjectPayload(message: { payload?: unknown; data?: unknown }) {
+  if (message.payload && typeof message.payload === 'object' && !Array.isArray(message.payload)) {
+    return message.payload as Record<string, unknown>
+  }
+
+  if (message.data && typeof message.data === 'object' && !Array.isArray(message.data)) {
+    return message.data as Record<string, unknown>
+  }
+
+  return null
+}
+
+function getReadReceiptMessageId(
+  readState: { lastReadMessageId?: string | null; message?: { id?: string } | null } | null | undefined,
+) {
+  return readState?.lastReadMessageId ?? readState?.message?.id ?? null
+}
+
+function formatTypingLabel(names: string[]) {
+  if (names.length === 0) {
+    return null
+  }
+
+  if (names.length === 1) {
+    return `${names[0]} sedang mengetik...`
+  }
+
+  if (names.length === 2) {
+    return `${names[0]} dan ${names[1]} sedang mengetik...`
+  }
+
+  return `${names[0]}, ${names[1]} dan ${names.length - 2} orang lain sedang mengetik...`
 }
 
 export function ServerChatView({
@@ -448,11 +485,16 @@ export function ServerChatView({
   const realtime = useRealtimeConnection()
   const snapshotStoreRef = useRef<Record<string, ChannelChatSnapshot>>({})
   const jumpResetTimeoutRef = useRef<number | null>(null)
+  const typingHeartbeatRef = useRef<number | null>(null)
+  const typingDraftRef = useRef('')
+  const typingActiveRef = useRef(false)
+  const typingUserTimeoutsRef = useRef<Record<string, number>>({})
   const [version, setVersion] = useState(0)
   const [pinnedPanelOpen, setPinnedPanelOpen] = useState(false)
   const [memberListOpen, setMemberListOpen] = useState(true)
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null)
   const [presenceOverrides, setPresenceOverrides] = useState<Record<string, ChatMember['presence']>>({})
+  const [typingUserIds, setTypingUserIds] = useState<string[]>([])
 
   const members = useMemo(
     () => createChatMembers(workspace.server.id, workspace.server.name, currentUser),
@@ -481,6 +523,15 @@ export function ServerChatView({
     refetchInterval: 15_000,
   })
 
+  const readReceiptQuery = useQuery({
+    queryKey: ['channel-read-receipt', channelKey],
+    queryFn: async () => {
+      const response = await getChannelReadReceiptRequest(activeChannel.id)
+      return response.data
+    },
+    enabled: Boolean(activeChannel.id),
+  })
+
   useEffect(() => {
     const latestMessage = realtime.latestMessage
 
@@ -488,34 +539,25 @@ export function ServerChatView({
       return
     }
 
-    const payload = (() => {
-      if (latestMessage.payload && typeof latestMessage.payload === 'object' && !Array.isArray(latestMessage.payload)) {
-        return latestMessage.payload as { userId?: string; status?: ChatMember['presence'] }
-      }
+    const payload = getEnvelopeObjectPayload(latestMessage)
+    const userId = typeof payload?.userId === 'string' ? payload.userId : null
+    const status =
+      payload?.status === 'online' || payload?.status === 'idle' || payload?.status === 'dnd'
+        ? payload.status
+        : null
 
-      if (typeof latestMessage.data === 'object' && latestMessage.data !== null && !Array.isArray(latestMessage.data)) {
-        return latestMessage.data as { userId?: string; status?: ChatMember['presence'] }
-      }
-
-      return null
-    })()
-
-    if (!payload?.userId || !payload.status) {
+    if (!userId || !status) {
       return
     }
 
     setPresenceOverrides((current) => {
-      const nextPresence = payload.status === 'online' || payload.status === 'idle' || payload.status === 'dnd'
-        ? payload.status
-        : 'offline'
-
-      if (current[payload.userId] === nextPresence) {
+      if (current[userId] === status) {
         return current
       }
 
       return {
         ...current,
-        [payload.userId]: nextPresence,
+        [userId]: status,
       }
     })
   }, [realtime.latestMessage])
@@ -572,7 +614,6 @@ export function ServerChatView({
     workspace,
     activeChannel,
     members,
-    currentUserId,
   )
 
   if (!snapshotStoreRef.current[channelKey]) {
@@ -602,6 +643,271 @@ export function ServerChatView({
   const mentionQuery = mentionRange?.query ?? ''
   const hasOlderMessages = snapshot.visibleCount < snapshot.messages.length
   const currentUserLabel = currentUser?.name?.trim() || currentUser?.username?.trim() || 'You'
+  const typingIndicatorLabel = useMemo(() => {
+    const knownMembers = new Map<string, string>()
+
+    for (const member of members) {
+      knownMembers.set(member.id, member.name)
+    }
+
+    for (const member of memberListMembers) {
+      knownMembers.set(member.id, member.displayName)
+    }
+
+    const names = typingUserIds
+      .filter((userId) => userId !== currentUserId)
+      .map((userId) => knownMembers.get(userId) ?? 'Seseorang')
+      .filter((name, index, allNames) => allNames.indexOf(name) === index)
+
+    return formatTypingLabel(names)
+  }, [currentUserId, memberListMembers, members, typingUserIds])
+
+  const clearTypingHeartbeat = () => {
+    if (typingHeartbeatRef.current !== null) {
+      window.clearInterval(typingHeartbeatRef.current)
+      typingHeartbeatRef.current = null
+    }
+  }
+
+  const resetTypingState = (channelId: string, shouldNotifyServer: boolean) => {
+    if (!channelId) {
+      typingActiveRef.current = false
+      clearTypingHeartbeat()
+      return
+    }
+
+    if (shouldNotifyServer && typingActiveRef.current && realtime.isConnected) {
+      realtime.sendEvent('typing.stop', { channelId })
+    }
+
+    typingActiveRef.current = false
+    clearTypingHeartbeat()
+  }
+
+  const ensureTypingHeartbeat = (channelId: string) => {
+    if (typingHeartbeatRef.current !== null) {
+      return
+    }
+
+    typingHeartbeatRef.current = window.setInterval(() => {
+      if (!typingDraftRef.current.trim()) {
+        resetTypingState(channelId, true)
+        return
+      }
+
+      realtime.sendEvent('typing.start', { channelId })
+    }, TYPING_HEARTBEAT_MS)
+  }
+
+  useEffect(() => {
+    const nextMessageId = getReadReceiptMessageId(readReceiptQuery.data)
+
+    updateSnapshot((current) => {
+      if (current.lastReadMessageId === nextMessageId) {
+        return current
+      }
+
+      return {
+        ...current,
+        lastReadMessageId: nextMessageId,
+      }
+    })
+  }, [readReceiptQuery.data])
+
+  useEffect(() => {
+    const channelId = activeChannel.id
+
+    if (!channelId || !realtime.isConnected) {
+      return undefined
+    }
+
+    realtime.sendEvent('subscribe', { channelId })
+
+    return () => {
+      resetTypingState(channelId, true)
+      setTypingUserIds([])
+
+      for (const timeoutId of Object.values(typingUserTimeoutsRef.current)) {
+        window.clearTimeout(timeoutId)
+      }
+      typingUserTimeoutsRef.current = {}
+
+      realtime.sendEvent('unsubscribe', { channelId })
+    }
+  }, [activeChannel.id, realtime.isConnected])
+
+  useEffect(() => {
+    const channelId = activeChannel.id
+    typingDraftRef.current = snapshot.draft
+
+    if (!channelId || !realtime.isConnected) {
+      resetTypingState(channelId ?? '', true)
+      return undefined
+    }
+
+    const hasDraft = snapshot.draft.trim().length > 0
+
+    if (!hasDraft) {
+      resetTypingState(channelId, true)
+      return undefined
+    }
+
+    if (!typingActiveRef.current) {
+      if (realtime.sendEvent('typing.start', { channelId })) {
+        typingActiveRef.current = true
+      }
+    }
+
+    ensureTypingHeartbeat(channelId)
+
+    return undefined
+  }, [activeChannel.id, realtime.isConnected, snapshot.draft])
+
+  useEffect(() => {
+    const channelId = activeChannel.id
+    const latestVisibleMessage = visibleMessages[visibleMessages.length - 1]
+
+    if (!channelId || !realtime.isConnected || !channelMessagesQuery.data?.length || !latestVisibleMessage) {
+      return
+    }
+
+    if (snapshot.lastReadMessageId === latestVisibleMessage.id) {
+      return
+    }
+
+    let cancelled = false
+
+    void updateChannelReadReceiptRequest(channelId, latestVisibleMessage.id)
+      .then((response) => {
+        if (cancelled) {
+          return
+        }
+
+        const nextMessageId = getReadReceiptMessageId(response.data)
+
+        updateSnapshot((current) => {
+          if (current.lastReadMessageId === nextMessageId) {
+            return current
+          }
+
+          return {
+            ...current,
+            lastReadMessageId: nextMessageId,
+          }
+        })
+      })
+      .catch(() => undefined)
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeChannel.id, channelMessagesQuery.data, realtime.isConnected, snapshot.lastReadMessageId, visibleMessages])
+
+  useEffect(() => {
+    const channelId = activeChannel.id
+
+    if (!channelId || !realtime.isConnected) {
+      return undefined
+    }
+
+    const typingStartSubscription = realtime.subscribe('typing.start', (message) => {
+      const payload = getEnvelopeObjectPayload(message)
+      const payloadChannelId = typeof payload?.channelId === 'string' ? payload.channelId : null
+      const userId = typeof payload?.userId === 'string' ? payload.userId : null
+
+      if (!payloadChannelId || payloadChannelId !== channelId || !userId || userId === currentUserId) {
+        return
+      }
+
+      setTypingUserIds((current) => (current.includes(userId) ? current : [...current, userId]))
+
+      const existingTimeout = typingUserTimeoutsRef.current[userId]
+      if (existingTimeout) {
+        window.clearTimeout(existingTimeout)
+      }
+
+      typingUserTimeoutsRef.current[userId] = window.setTimeout(() => {
+        setTypingUserIds((current) => current.filter((item) => item !== userId))
+        delete typingUserTimeoutsRef.current[userId]
+      }, 3200)
+    })
+
+    const typingStopSubscription = realtime.subscribe('typing.stop', (message) => {
+      const payload = getEnvelopeObjectPayload(message)
+      const payloadChannelId = typeof payload?.channelId === 'string' ? payload.channelId : null
+      const userId = typeof payload?.userId === 'string' ? payload.userId : null
+
+      if (!payloadChannelId || payloadChannelId !== channelId || !userId || userId === currentUserId) {
+        return
+      }
+
+      const existingTimeout = typingUserTimeoutsRef.current[userId]
+      if (existingTimeout) {
+        window.clearTimeout(existingTimeout)
+        delete typingUserTimeoutsRef.current[userId]
+      }
+
+      setTypingUserIds((current) => current.filter((item) => item !== userId))
+    })
+
+    const readReceiptSubscription = realtime.subscribe('read.receipt.updated', (message) => {
+      const payload = getEnvelopeObjectPayload(message)
+      const payloadChannelId = typeof payload?.channelId === 'string' ? payload.channelId : null
+      const userId = typeof payload?.userId === 'string' ? payload.userId : null
+      const messageId = typeof payload?.messageId === 'string' ? payload.messageId : null
+
+      if (!payloadChannelId || payloadChannelId !== channelId || !messageId || userId !== currentUserId) {
+        return
+      }
+
+      updateSnapshot((current) => {
+        if (current.lastReadMessageId === messageId) {
+          return current
+        }
+
+        return {
+          ...current,
+          lastReadMessageId: messageId,
+        }
+      })
+    })
+
+    const messageCreatedSubscription = realtime.subscribe('message.created', (message) => {
+      const payload = getEnvelopeObjectPayload(message)
+      const payloadChannelId = typeof payload?.channelId === 'string' ? payload.channelId : null
+
+      if (!payloadChannelId || payloadChannelId !== channelId) {
+        return
+      }
+
+      const incomingMessage = mapMessageRecordToChatMessage(payload as MessageRecord, 'sent')
+
+      updateSnapshot((current) => {
+        const existingIndex = current.messages.findIndex((item) => item.id === incomingMessage.id)
+        if (existingIndex !== -1) {
+          return {
+            ...current,
+            messages: current.messages.map((item) =>
+              item.id === incomingMessage.id ? incomingMessage : item,
+            ),
+          }
+        }
+
+        return {
+          ...current,
+          messages: sortMessagesByCreatedAt([...current.messages, incomingMessage]),
+          visibleCount: Math.max(current.visibleCount, DEFAULT_VISIBLE_MESSAGE_COUNT),
+        }
+      })
+    })
+
+    return () => {
+      typingStartSubscription.unsubscribe()
+      typingStopSubscription.unsubscribe()
+      readReceiptSubscription.unsubscribe()
+      messageCreatedSubscription.unsubscribe()
+    }
+  }, [activeChannel.id, currentUserId, realtime.isConnected, realtime.subscribe])
 
   useEffect(() => {
     const serverMessages = channelMessagesQuery.data
@@ -639,13 +945,13 @@ export function ServerChatView({
     let cancelled = false
 
     const hydrateReactions = async () => {
-      const reactionEntries = await Promise.all(
+      const reactionEntries: Array<readonly [string, ChatMessage['reactions']]> = await Promise.all(
         serverMessages.map(async (message) => {
           try {
             const response = await getMessageReactionsRequest(message.id)
             return [message.id, mapReactionRecordsToChatReactions(response.data, currentUserId)] as const
           } catch {
-            return [message.id, []] as const
+            return [message.id, [] as ChatMessage['reactions']] as const
           }
         }),
       )
@@ -925,7 +1231,9 @@ export function ServerChatView({
 
       updateSnapshot((current) => ({
         ...current,
-        messages: current.messages.map((message) => (message.id === optimisticId ? createdMessage : message)),
+        messages: current.messages.some((message) => message.id === createdMessage.id)
+          ? current.messages.filter((message) => message.id !== optimisticId || message.id === createdMessage.id)
+          : current.messages.map((message) => (message.id === optimisticId ? createdMessage : message)),
       }))
     } catch {
       updateSnapshot((current) => ({
@@ -972,7 +1280,9 @@ export function ServerChatView({
 
       updateSnapshot((current) => ({
         ...current,
-        messages: current.messages.map((message) => (message.id === messageId ? createdMessage : message)),
+        messages: current.messages.some((message) => message.id === createdMessage.id)
+          ? current.messages.filter((message) => message.id !== messageId || message.id === createdMessage.id)
+          : current.messages.map((message) => (message.id === messageId ? createdMessage : message)),
       }))
     } catch {
       updateSnapshot((current) => ({
@@ -1105,6 +1415,7 @@ export function ServerChatView({
             hasOlderMessages={hasOlderMessages}
             onLoadOlderMessages={handleLoadOlderMessages}
             highlightedMessageId={highlightedMessageId}
+            readReceiptMessageId={snapshot.lastReadMessageId}
             onJumpToMessage={handleJumpToMessage}
             onTogglePin={handleTogglePin}
             onReact={handleReactToMessage}
@@ -1112,6 +1423,13 @@ export function ServerChatView({
           />
 
           <div className="mt-4">
+            {typingIndicatorLabel ? (
+              <div className="mb-3 flex items-center gap-2 px-2 text-xs text-slate-400" aria-live="polite">
+                <span className="h-2 w-2 rounded-full bg-[#5865F2] animate-pulse" />
+                <span>{typingIndicatorLabel}</span>
+              </div>
+            ) : null}
+
             <MessageComposer
               draft={snapshot.draft}
               attachments={snapshot.attachments}

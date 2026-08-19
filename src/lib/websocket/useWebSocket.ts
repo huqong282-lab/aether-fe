@@ -281,8 +281,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRes
 
   const sendEvent = (type: string, payload?: unknown, meta?: Record<string, unknown>) => {
     return send({
-      type,
-      payload,
+      event: type,
+      data: payload,
       ...(meta ?? {}),
     });
   };

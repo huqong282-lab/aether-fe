@@ -70,6 +70,14 @@ function SparkIcon() {
   )
 }
 
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5" aria-hidden="true">
+      <path d="M20 7L10 17l-5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 function EmojiButton({ emoji }: { emoji: string }) {
   return <span aria-hidden="true">{emoji}</span>
 }
@@ -135,11 +143,13 @@ export function MessageItem({
   onTogglePin,
   onReact,
   onRetry,
+  readReceiptMessageId,
 }: {
   message: ChatMessage
   member: ChatMember
   members: ChatMember[]
   isHighlighted?: boolean
+  readReceiptMessageId: string | null
   onJump: (messageId: string) => void
   onTogglePin: (messageId: string) => void
   onReact: (messageId: string, emoji: string) => void
@@ -322,6 +332,13 @@ export function MessageItem({
                 <RetryIcon />
                 Retry
               </button>
+            </div>
+          ) : null}
+
+          {readReceiptMessageId === message.id ? (
+            <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold text-emerald-100">
+              <CheckIcon />
+              Dibaca
             </div>
           ) : null}
         </div>

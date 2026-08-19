@@ -15,6 +15,7 @@ export function MessageList({
   hasOlderMessages,
   onLoadOlderMessages,
   highlightedMessageId,
+  readReceiptMessageId,
   onJumpToMessage,
   onTogglePin,
   onReact,
@@ -26,6 +27,7 @@ export function MessageList({
   hasOlderMessages: boolean
   onLoadOlderMessages: () => void
   highlightedMessageId: string | null
+  readReceiptMessageId: string | null
   onJumpToMessage: (messageId: string) => void
   onTogglePin: (messageId: string) => void
   onReact: (messageId: string, emoji: string) => void
@@ -130,18 +132,30 @@ export function MessageList({
           </div>
         ) : null}
 
-        {groupedMessages.map((group) => (
-          <MessageGroup
-            key={`${group.authorId}-${group.messages[0]?.id}`}
-            group={group}
-            members={members}
-            highlightedMessageId={highlightedMessageId}
-            onJump={onJumpToMessage}
-            onTogglePin={onTogglePin}
-            onReact={onReact}
-            onRetry={onRetryMessage}
-          />
-        ))}
+        {groupedMessages.length > 0 ? (
+          groupedMessages.map((group) => (
+            <MessageGroup
+              key={`${group.authorId}-${group.messages[0]?.id}`}
+              group={group}
+              members={members}
+              highlightedMessageId={highlightedMessageId}
+              readReceiptMessageId={readReceiptMessageId}
+              onJump={onJumpToMessage}
+              onTogglePin={onTogglePin}
+              onReact={onReact}
+              onRetry={onRetryMessage}
+            />
+          ))
+        ) : (
+          <div className="flex min-h-[280px] items-center justify-center px-4 py-10 text-center">
+            <div className="max-w-md">
+              <p className="text-lg font-semibold text-white">Belum ada pesan di channel ini</p>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                Mulai percakapan pertama untuk menampilkan typing indicator dan read receipt.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
