@@ -107,7 +107,7 @@ export async function getChannelMessagesRequest(
     params,
   })
 
-  return response.data as ChannelMessageListResponse
+  return response.data.data as ChannelMessageListResponse["data"]
 }
 
 export async function createChannelMessageRequest(channelId: string, payload: CreateChannelMessagePayload) {

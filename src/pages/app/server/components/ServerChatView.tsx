@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../../../../state/auth.state'
 import type { ServerChannelRecord, ServerWorkspaceRecord } from '../../../../lib/server/server-workspace.api'
 import { getServerMembersRequest, type ServerMemberMentionRecord } from '../../../../lib/server/server-members.api'
@@ -482,6 +483,7 @@ export function ServerChatView({
   activeChannel: ServerChannelRecord
 }) {
   const currentUser = useAuthStore((state) => state.user)
+  const [searchParams] = useSearchParams()
   const realtime = useRealtimeConnection()
   const snapshotStoreRef = useRef<Record<string, ChannelChatSnapshot>>({})
   const jumpResetTimeoutRef = useRef<number | null>(null)
@@ -503,6 +505,7 @@ export function ServerChatView({
 
   const channelKey = `${workspace.server.id}:${activeChannel.id}`
   const currentUserId = currentUser?.id ?? members[0]?.id ?? 'current-user'
+  const routeMessageId = searchParams.get('messageId')
 
   const channelMessagesQuery = useQuery({
     queryKey: ['server-channel-messages', channelKey],
@@ -531,6 +534,10 @@ export function ServerChatView({
     },
     enabled: Boolean(activeChannel.id),
   })
+
+  useEffect(() => {
+    setHighlightedMessageId(routeMessageId)
+  }, [routeMessageId, activeChannel.id])
 
   useEffect(() => {
     const latestMessage = realtime.latestMessage
