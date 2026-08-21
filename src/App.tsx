@@ -7,6 +7,7 @@ import { AppPage } from './pages/app/AppPage'
 import { ServerWorkspacePage } from './pages/app/server/ServerWorkspacePage'
 import { ServerSettingsPage } from './pages/app/server/ServerSettingsPage'
 import { UserSettingsPage } from './pages/settings/UserSettingsPage'
+import { NotificationCenter } from './components/notifications/NotificationCenter'
 import { RealtimeConnectionProvider } from './lib/websocket'
 import { useAuthStore } from './state/auth.state'
 
@@ -23,7 +24,12 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 function ProtectedRealtimeRoute({ children }: { children: ReactNode }) {
   return (
     <ProtectedRoute>
-      <RealtimeConnectionProvider>{children}</RealtimeConnectionProvider>
+      <RealtimeConnectionProvider>
+        <>
+          {children}
+          <NotificationCenter />
+        </>
+      </RealtimeConnectionProvider>
     </ProtectedRoute>
   )
 }
