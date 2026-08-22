@@ -21,6 +21,7 @@ import { AppCreateServerModal } from '../components/AppCreateServerModal'
 import { useChannelReadStore } from '../../../state/channel.state'
 import { AppServerRail } from '../components/AppServerRail'
 import { AppUserPanel } from '../components/AppUserPanel'
+import { SearchOverlay } from '../components/SearchOverlay'
 import { ServerChannelMain } from './components/ServerChannelMain'
 import { ServerChannelSidebar } from './components/ServerChannelSidebar'
 
@@ -47,6 +48,7 @@ export function ServerWorkspacePage() {
   const serverId = params.serverId ?? null
   const channelId = params.channelId ?? null
   const [isCreateServerOpen, setIsCreateServerOpen] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const setActiveServerId = useServerRailStore((state) => state.setActiveServerId)
   const markChannelRead = useChannelReadStore((state) => state.markChannelRead)
 
@@ -206,12 +208,25 @@ export function ServerWorkspacePage() {
         />
 
         <div className="relative flex min-w-0 flex-1">
-          <ServerChannelMain workspace={workspace} activeChannelId={resolvedChannelId} />
+          <ServerChannelMain
+            workspace={workspace}
+            activeChannelId={resolvedChannelId}
+            onSearchClick={() => setIsSearchOpen(true)}
+          />
         </div>
       </div>
 
       <AppUserPanel variant="mobile" />
       <AppCreateServerModal open={isCreateServerOpen} onClose={() => setIsCreateServerOpen(false)} />
+      <SearchOverlay
+        open={isSearchOpen}
+        scope={{
+          serverId,
+          serverName: workspace.server.name,
+          channelId: resolvedChannelId,
+        }}
+        onClose={() => setIsSearchOpen(false)}
+      />
     </main>
   )
 }

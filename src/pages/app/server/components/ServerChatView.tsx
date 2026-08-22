@@ -20,6 +20,7 @@ import {
   updateChannelReadReceiptRequest,
 } from '../../../../lib/message/read-receipt.api'
 import { useRealtimeConnection } from '../../../../lib/websocket'
+import { SearchIcon } from '../../app-icons'
 import {
   createChatMembers,
   createId,
@@ -478,9 +479,11 @@ function formatTypingLabel(names: string[]) {
 export function ServerChatView({
   workspace,
   activeChannel,
+  onSearchClick,
 }: {
   workspace: ServerWorkspaceRecord
   activeChannel: ServerChannelRecord
+  onSearchClick: () => void
 }) {
   const currentUser = useAuthStore((state) => state.user)
   const [searchParams] = useSearchParams()
@@ -1361,6 +1364,16 @@ export function ServerChatView({
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onSearchClick}
+            className="inline-flex h-10 items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-4 text-sm font-medium text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
+            aria-label="Open search overlay"
+          >
+            <SearchIcon className="h-4 w-4 text-slate-400" />
+            <span className="hidden sm:inline">Search</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setMemberListOpen((current) => !current)}
