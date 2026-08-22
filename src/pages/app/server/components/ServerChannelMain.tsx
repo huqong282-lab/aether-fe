@@ -4,9 +4,11 @@ import { ServerChatView } from './ServerChatView'
 export function ServerChannelMain({
   workspace,
   activeChannelId,
+  onSearchClick,
 }: {
   workspace: ServerWorkspaceRecord
   activeChannelId: string | null
+  onSearchClick: () => void
 }) {
   const activeChannel =
     workspace.channels.find((channel) => channel.id === activeChannelId) ?? workspace.channels[0] ?? null
@@ -21,6 +23,6 @@ export function ServerChannelMain({
     )
   }
 
-  return <ServerChatView workspace={workspace} activeChannel={activeChannel} />
+  return <ServerChatView workspace={workspace} activeChannel={activeChannel} onSearchClick={onSearchClick} />
 }
 

@@ -1,6 +1,10 @@
 import { AddFriendIcon, GlobeIcon, MessageIcon, MoreIcon, SearchIcon } from '../app-icons'
 import { friendItems } from '../app.data'
 
+type AppMainProps = {
+  onSearchClick: () => void
+}
+
 function Avatar({ name, accent }: { name: string; accent: string }) {
   return (
     <div
@@ -18,7 +22,7 @@ function Avatar({ name, accent }: { name: string; accent: string }) {
   )
 }
 
-export function AppMain() {
+export function AppMain({ onSearchClick }: AppMainProps) {
   return (
     <section className="flex min-w-0 flex-1 flex-col bg-[#36393F]">
       <header className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4 lg:px-6">
@@ -41,10 +45,14 @@ export function AppMain() {
       </header>
 
       <div className="border-b border-white/[0.06] px-5 py-4 lg:px-6">
-        <div className="flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-[#202225] px-4 py-3 text-slate-400">
+        <button
+          type="button"
+          onClick={onSearchClick}
+          className="flex w-full items-center gap-3 rounded-2xl border border-white/[0.08] bg-[#202225] px-4 py-3 text-left text-slate-400 transition hover:border-white/[0.14] hover:bg-[#25272b] hover:text-slate-200"
+        >
           <SearchIcon className="h-5 w-5 text-slate-500" />
           <span>Search</span>
-        </div>
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-5 lg:px-6">

@@ -2,6 +2,10 @@ import { FriendsIcon, QuestIcon, SearchIcon, ShopIcon } from '../app-icons'
 import { directMessages, sidebarItems } from '../app.data'
 import { AppUserPanel } from './AppUserPanel'
 
+type AppSidebarProps = {
+  onSearchClick: () => void
+}
+
 function PresenceDot({ state }: { state: 'online' | 'idle' | 'dnd' | 'offline' }) {
   const classes = {
     online: 'bg-[#3BA55D]',
@@ -33,14 +37,18 @@ function Avatar({ name, accent, presence }: { name: string; accent: string; pres
   )
 }
 
-export function AppSidebar() {
+export function AppSidebar({ onSearchClick }: AppSidebarProps) {
   return (
     <aside className="hidden w-[320px] shrink-0 border-r border-white/[0.06] bg-[#2F3136] lg:flex lg:flex-col">
       <div className="border-b border-white/[0.06] p-4">
-        <div className="flex items-center gap-3 rounded-2xl bg-black/20 px-4 py-3 text-sm text-slate-300">
+        <button
+          type="button"
+          onClick={onSearchClick}
+          className="flex w-full items-center gap-3 rounded-2xl bg-black/20 px-4 py-3 text-left text-sm text-slate-300 transition hover:bg-white/[0.06] hover:text-white"
+        >
           <SearchIcon className="h-4 w-4 text-slate-400" />
           <span className="truncate">Find or start a conversation</span>
-        </div>
+        </button>
       </div>
 
       <nav className="border-b border-white/[0.06] px-4 py-3">
