@@ -290,10 +290,20 @@ export function MessageItem({
               {message.attachments.map((attachment) => (
                 <div
                   key={attachment.id}
-                  className="rounded-2xl border border-white/[0.08] bg-[#202225] px-3 py-2 text-xs text-slate-300"
+                  className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#202225] text-xs text-slate-300"
                 >
-                  <div className="font-semibold text-white">{attachment.name}</div>
-                  <div className="mt-0.5 text-slate-500">{attachment.sizeLabel}</div>
+                  {attachment.fileType?.startsWith('image/') && attachment.thumbnailUrl ? (
+                    <img
+                      src={attachment.thumbnailUrl}
+                      alt={attachment.name}
+                      className="h-28 w-44 object-cover"
+                    />
+                  ) : null}
+
+                  <div className="px-3 py-2">
+                    <div className="font-semibold text-white">{attachment.name}</div>
+                    <div className="mt-0.5 text-slate-500">{attachment.sizeLabel}</div>
+                  </div>
                 </div>
               ))}
             </div>

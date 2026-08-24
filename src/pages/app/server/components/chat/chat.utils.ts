@@ -1,4 +1,11 @@
-import type { ChatAttachment, ChatMember, ChatMessage, ChatMessageGroup, PresenceState } from './chat.types'
+import type {
+  ChatAttachment,
+  ChatMember,
+  ChatMessage,
+  ChatMessageGroup,
+  ComposerAttachment,
+  PresenceState,
+} from './chat.types'
 
 export const DEFAULT_VISIBLE_MESSAGE_COUNT = 10
 export const LOAD_MORE_STEP = 6
@@ -238,11 +245,70 @@ export function createSeedMessages(
   }))
 }
 
-export function toAttachmentPreview(file: File): ChatAttachment {
+const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'])
+const VIDEO_MIME_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime'])
+const AUDIO_MIME_TYPES = new Set(['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/webm'])
+
+export const MAX_UPLOAD_SIZE_BYTES = 1024 * 1024 * 1024
+
+export function isSupportedUploadType(fileType: string) {
+  return (
+    IMAGE_MIME_TYPES.has(fileType) ||
+    VIDEO_MIME_TYPES.has(fileType) ||
+    AUDIO_MIME_TYPES.has(fileType) ||
+    fileType === 'application/pdf' ||
+    fileType === 'application/zip' ||
+    fileType === 'application/x-zip-compressed'
+  )
+}
+
+export function getComposerAttachmentPreviewKind(fileType: string): ComposerAttachment['previewKind'] {
+  if (IMAGE_MIME_TYPES.has(fileType)) {
+    return 'image'
+  }
+
+  if (VIDEO_MIME_TYPES.has(fileType)) {
+    return 'video'
+  }
+
+  if (AUDIO_MIME_TYPES.has(fileType)) {
+    return 'audio'
+  }
+
+  return 'file'
+}
+
+export function toAttachmentPreview(file: File): ComposerAttachment {
   return {
     id: createId('attachment'),
+    file,
     name: file.name,
     sizeLabel: formatFileSize(file.size),
+    fileType: file.type || 'application/octet-stream',
+    fileSize: file.size,
+    previewUrl: typeof URL !== 'undefined' ? URL.createObjectURL(file) : null,
+    previewKind: getComposerAttachmentPreviewKind(file.type || 'application/octet-stream'),
+    status: 'pending',
+    progress: 0,
+  }
+}
+
+export function toMessageAttachment(attachment: {
+  id: string
+  fileName: string
+  fileSize: number | string
+  fileUrl: string
+  thumbnailUrl: string | null
+  fileType: string
+}): ChatAttachment {
+  return {
+    id: attachment.id,
+    name: attachment.fileName,
+    sizeLabel: formatFileSize(Number(attachment.fileSize)),
+    fileUrl: attachment.fileUrl,
+    thumbnailUrl: attachment.thumbnailUrl,
+    fileType: attachment.fileType,
+    fileSize: Number(attachment.fileSize),
   }
 }
 

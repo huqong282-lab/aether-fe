@@ -14,6 +14,31 @@ export type ChatAttachment = {
   id: string
   name: string
   sizeLabel: string
+  fileUrl?: string
+  thumbnailUrl?: string | null
+  fileType?: string
+  fileSize?: number
+}
+
+export type ComposerAttachmentStatus = 'pending' | 'uploading' | 'uploaded' | 'error'
+
+export type ComposerAttachment = {
+  id: string
+  file: File
+  name: string
+  sizeLabel: string
+  fileType: string
+  fileSize: number
+  previewUrl: string | null
+  previewKind: 'image' | 'video' | 'audio' | 'file'
+  status: ComposerAttachmentStatus
+  progress: number
+  errorMessage?: string | null
+  fileUrl?: string
+  thumbnailUrl?: string | null
+  publicId?: string
+  resourceType?: string
+  format?: string
 }
 
 export type ChatReaction = {
@@ -42,7 +67,7 @@ export type ChatMessageGroup = {
 export type ChannelChatSnapshot = {
   messages: ChatMessage[]
   draft: string
-  attachments: ChatAttachment[]
+  attachments: ComposerAttachment[]
   visibleCount: number
   lastReadMessageId: string | null
 }
