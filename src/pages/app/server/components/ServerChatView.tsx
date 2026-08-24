@@ -16,6 +16,10 @@ import {
   unpinMessageRequest,
 } from '../../../../lib/message/message.api'
 import {
+  requestUploadSignature,
+  uploadFileToCloudinary,
+} from '../../../../lib/upload/upload.api'
+import {
   getChannelReadReceiptRequest,
   updateChannelReadReceiptRequest,
 } from '../../../../lib/message/read-receipt.api'
@@ -28,9 +32,12 @@ import {
   formatFileSize,
   formatLongMessageTime,
   getActiveMentionRange,
+  isSupportedUploadType,
+  MAX_UPLOAD_SIZE_BYTES,
   toAttachmentPreview,
+  toMessageAttachment,
 } from './chat/chat.utils'
-import type { ChatMember, ChatMessage, ChannelChatSnapshot } from './chat/chat.types'
+import type { ChatMember, ChatMessage, ChannelChatSnapshot, ComposerAttachment } from './chat/chat.types'
 import { MessageComposer } from './chat/MessageComposer'
 import { MessageList } from './chat/MessageList'
 
@@ -47,11 +54,16 @@ function mapMessageRecordToChatMessage(
     status,
     reactions,
     isPinned: record.isPinned,
-    attachments: record.attachments?.map((attachment) => ({
-      id: attachment.id,
-      name: attachment.fileName,
-      sizeLabel: formatFileSize(Number(attachment.fileSize)),
-    })),
+    attachments: record.attachments?.map((attachment) =>
+      toMessageAttachment({
+        id: attachment.id,
+        fileName: attachment.fileName,
+        fileSize: attachment.fileSize,
+        fileUrl: attachment.fileUrl,
+        thumbnailUrl: attachment.thumbnailUrl,
+        fileType: attachment.fileType,
+      }),
+    ),
   }
 }
 
@@ -115,6 +127,28 @@ function mapServerMemberToView(member: ServerMemberMentionRecord): ServerMemberV
     presence,
     accent: createMemberAccent(displayName),
   }
+}
+
+function revokeComposerAttachmentPreview(attachment: ComposerAttachment) {
+  if (typeof URL === 'undefined' || !attachment.previewUrl) {
+    return
+  }
+
+  URL.revokeObjectURL(attachment.previewUrl)
+}
+
+function mapComposerAttachmentsToMessageAttachments(attachments: ComposerAttachment[]) {
+  return attachments
+    .filter((attachment) => attachment.status === 'uploaded' && attachment.fileUrl)
+    .map((attachment) => ({
+      id: attachment.publicId ?? attachment.id,
+      name: attachment.name,
+      sizeLabel: formatFileSize(attachment.fileSize),
+      fileUrl: attachment.fileUrl as string,
+      thumbnailUrl: attachment.thumbnailUrl ?? null,
+      fileType: attachment.fileType,
+      fileSize: attachment.fileSize,
+    }))
 }
 
 function groupMembersByPresence(members: ServerMemberView[]) {
@@ -1194,6 +1228,16 @@ export function ServerChatView({
   const handleSend = async () => {
     const trimmedDraft = snapshot.draft.trim()
     const hasAttachments = snapshot.attachments.length > 0
+    const hasPendingUploads = snapshot.attachments.some(
+      (attachment) => attachment.status === 'pending' || attachment.status === 'uploading',
+    )
+    const hasUploadErrors = snapshot.attachments.some((attachment) => attachment.status === 'error')
+    const messageAttachments = mapComposerAttachmentsToMessageAttachments(snapshot.attachments)
+    const content = trimmedDraft || 'Attachment'
+
+    if (hasPendingUploads || hasUploadErrors) {
+      return
+    }
 
     if (!trimmedDraft && !hasAttachments) {
       return
@@ -1203,12 +1247,13 @@ export function ServerChatView({
     const optimisticMessage: ChatMessage = {
       id: optimisticId,
       authorId: currentUser?.id ?? members[0]?.id ?? 'current-user',
-      content: trimmedDraft || 'Attachment only',
+      content,
       createdAt: new Date().toISOString(),
       status: 'sending',
-      attachments: hasAttachments ? snapshot.attachments : undefined,
+      attachments: messageAttachments.length > 0 ? messageAttachments : undefined,
     }
 
+    const attachmentsToClear = snapshot.attachments
     updateSnapshot((current) => ({
       ...current,
       messages: [...current.messages, optimisticMessage],
@@ -1217,24 +1262,21 @@ export function ServerChatView({
       visibleCount: Math.min(current.messages.length + 1, Math.max(current.visibleCount, DEFAULT_VISIBLE_MESSAGE_COUNT)),
     }))
 
-    if (hasAttachments) {
-      window.setTimeout(() => {
-        const shouldFail = trimmedDraft.toLowerCase().includes('fail')
-
-        updateSnapshot((current) => ({
-          ...current,
-          messages: current.messages.map((message) =>
-            message.id === optimisticId ? { ...message, status: shouldFail ? 'failed' : 'sent' } : message,
-          ),
-        }))
-      }, 900)
-
-      return
-    }
+    attachmentsToClear.forEach((attachment) => revokeComposerAttachmentPreview(attachment))
 
     try {
       const response = await createChannelMessageRequest(activeChannel.id, {
-        content: trimmedDraft,
+        content,
+        attachments:
+          messageAttachments.length > 0
+            ? messageAttachments.map((attachment) => ({
+                fileUrl: attachment.fileUrl ?? '',
+                thumbnailUrl: attachment.thumbnailUrl ?? null,
+                fileType: attachment.fileType ?? 'application/octet-stream',
+                fileSize: attachment.fileSize ?? 0,
+                fileName: attachment.name,
+              }))
+            : undefined,
       })
 
       const createdMessage = mapMessageRecordToChatMessage(response.data, 'sent')
@@ -1268,22 +1310,18 @@ export function ServerChatView({
       ),
     }))
 
-    if (failedMessage.attachments && failedMessage.attachments.length > 0) {
-      window.setTimeout(() => {
-        updateSnapshot((current) => ({
-          ...current,
-          messages: current.messages.map((message) =>
-            message.id === messageId ? { ...message, status: 'sent' } : message,
-          ),
-        }))
-      }, 700)
-
-      return
-    }
+    const retryAttachments = failedMessage.attachments?.map((attachment) => ({
+      fileUrl: attachment.fileUrl ?? '',
+      thumbnailUrl: attachment.thumbnailUrl ?? null,
+      fileType: attachment.fileType ?? 'application/octet-stream',
+      fileSize: attachment.fileSize ?? 0,
+      fileName: attachment.name,
+    }))
 
     try {
       const response = await createChannelMessageRequest(activeChannel.id, {
         content: failedMessage.content,
+        attachments: retryAttachments?.length ? retryAttachments : undefined,
       })
 
       const createdMessage = mapMessageRecordToChatMessage(response.data, 'sent')
@@ -1304,13 +1342,142 @@ export function ServerChatView({
     }
   }
 
-  const handleAttachFiles = (files: FileList | File[]) => {
-    const nextAttachments = Array.from(files).map((file) => toAttachmentPreview(file))
+  const handleAttachFiles = async (
+    files: FileList | File[],
+    options?: {
+      replaceAttachmentId?: string
+    },
+  ) => {
+    const selectedFiles = Array.from(files)
+    const nextAttachments = selectedFiles.map((file) => toAttachmentPreview(file))
+    const replaceAttachmentId = options?.replaceAttachmentId ?? null
+
+    if (replaceAttachmentId) {
+      const attachmentToReplace = snapshot.attachments.find((attachment) => attachment.id === replaceAttachmentId)
+      if (attachmentToReplace) {
+        revokeComposerAttachmentPreview(attachmentToReplace)
+      }
+    }
 
     updateSnapshot((current) => ({
       ...current,
-      attachments: [...current.attachments, ...nextAttachments],
+      attachments: replaceAttachmentId
+        ? [...current.attachments.filter((attachment) => attachment.id !== replaceAttachmentId), ...nextAttachments]
+        : [...current.attachments, ...nextAttachments],
     }))
+
+    for (const attachment of nextAttachments) {
+      if (!isSupportedUploadType(attachment.fileType)) {
+        updateSnapshot((current) => ({
+          ...current,
+          attachments: current.attachments.map((item) =>
+            item.id === attachment.id
+              ? {
+                  ...item,
+                  status: 'error',
+                  errorMessage: 'Tipe file tidak didukung',
+                  progress: 0,
+                }
+              : item,
+          ),
+        }))
+        continue
+      }
+
+      if (attachment.fileSize > MAX_UPLOAD_SIZE_BYTES) {
+        updateSnapshot((current) => ({
+          ...current,
+          attachments: current.attachments.map((item) =>
+            item.id === attachment.id
+              ? {
+                  ...item,
+                  status: 'error',
+                  errorMessage: 'Ukuran file maksimal 1GB',
+                  progress: 0,
+                }
+              : item,
+          ),
+        }))
+        continue
+      }
+
+      try {
+        updateSnapshot((current) => ({
+          ...current,
+          attachments: current.attachments.map((item) =>
+            item.id === attachment.id
+              ? {
+                  ...item,
+                  status: 'uploading',
+                  progress: 0,
+                  errorMessage: null,
+                }
+              : item,
+          ),
+        }))
+
+        const signatureResponse = await requestUploadSignature(activeChannel.id, {
+          fileName: attachment.file.name,
+          fileType: attachment.fileType,
+          fileSize: attachment.fileSize,
+        })
+
+        const uploadResponse = await uploadFileToCloudinary({
+          uploadUrl: signatureResponse.data.uploadUrl,
+          file: attachment.file,
+          apiKey: signatureResponse.data.apiKey,
+          signature: signatureResponse.data.signature,
+          timestamp: signatureResponse.data.timestamp,
+          folder: signatureResponse.data.folder,
+          resourceType: signatureResponse.data.resourceType,
+          onProgress: (progress) => {
+            updateSnapshot((current) => ({
+              ...current,
+              attachments: current.attachments.map((item) =>
+                item.id === attachment.id
+                  ? {
+                      ...item,
+                      progress,
+                    }
+                  : item,
+              ),
+            }))
+          },
+        })
+
+        updateSnapshot((current) => ({
+          ...current,
+          attachments: current.attachments.map((item) =>
+            item.id === attachment.id
+              ? {
+                  ...item,
+                  status: 'uploaded',
+                  progress: 100,
+                  fileUrl: uploadResponse.secure_url,
+                  thumbnailUrl:
+                    uploadResponse.resource_type === 'image' ? uploadResponse.secure_url : null,
+                  publicId: uploadResponse.public_id,
+                  resourceType: uploadResponse.resource_type,
+                  format: uploadResponse.format,
+                }
+              : item,
+          ),
+        }))
+      } catch {
+        updateSnapshot((current) => ({
+          ...current,
+          attachments: current.attachments.map((item) =>
+            item.id === attachment.id
+              ? {
+                  ...item,
+                  status: 'error',
+                  errorMessage: 'Upload gagal. Coba lagi dengan file lain.',
+                }
+              : item,
+          ),
+        }))
+      }
+    }
   }
 
   const handlePickMention = (member: ChatMember) => {
@@ -1342,11 +1509,33 @@ export function ServerChatView({
   }
 
   const handleRemoveAttachment = (attachmentId: string) => {
+    const attachmentToRemove = snapshot.attachments.find((attachment) => attachment.id === attachmentId)
+
+    if (attachmentToRemove) {
+      revokeComposerAttachmentPreview(attachmentToRemove)
+    }
+
     updateSnapshot((current) => ({
       ...current,
       attachments: current.attachments.filter((attachment) => attachment.id !== attachmentId),
     }))
   }
+
+  const handleRemoveAllAttachments = () => {
+    snapshot.attachments.forEach((attachment) => revokeComposerAttachmentPreview(attachment))
+
+    updateSnapshot((current) => ({
+      ...current,
+      attachments: [],
+    }))
+  }
+
+  const canSendMessage =
+    Boolean(snapshot.draft.trim() || snapshot.attachments.some((attachment) => attachment.status === 'uploaded')) &&
+    !snapshot.attachments.some(
+      (attachment) =>
+        attachment.status === 'pending' || attachment.status === 'uploading' || attachment.status === 'error',
+    )
 
   return (
     <section className="relative flex min-w-0 flex-1 flex-col bg-[#36393F]">
@@ -1461,6 +1650,8 @@ export function ServerChatView({
               onAttachFiles={handleAttachFiles}
               onPickMention={handlePickMention}
               onRemoveAttachment={handleRemoveAttachment}
+              onRemoveAllAttachments={handleRemoveAllAttachments}
+              canSend={canSendMessage}
             />
           </div>
         </div>
