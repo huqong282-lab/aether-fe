@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useAuthStore } from '../../../state/auth.state'
 import { useServerRailStore } from '../../../state/server.state'
+import { useVoiceChannelControls } from '../../../lib/voice/useVoiceChannelControls'
 import {
   getServerByIdRequest,
   getOwnedServersRequest,
@@ -24,6 +25,7 @@ import { AppUserPanel } from '../components/AppUserPanel'
 import { SearchOverlay } from '../components/SearchOverlay'
 import { ServerChannelMain } from './components/ServerChannelMain'
 import { ServerChannelSidebar } from './components/ServerChannelSidebar'
+import { VoiceControlBar } from './components/VoiceControlBar'
 
 function sortByPosition<T extends { position: number }>(items: T[]) {
   return [...items].sort((left, right) => left.position - right.position)
@@ -51,6 +53,7 @@ export function ServerWorkspacePage() {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const setActiveServerId = useServerRailStore((state) => state.setActiveServerId)
   const markChannelRead = useChannelReadStore((state) => state.markChannelRead)
+  const voiceControls = useVoiceChannelControls()
 
   const ownedServersQuery = useQuery({
     queryKey: ownedServersQueryKey,
@@ -126,7 +129,7 @@ export function ServerWorkspacePage() {
     }
   }, [workspace])
 
-  const resolvedChannelId = useMemo(() => {
+  const resolvedChannelId = (() => {
     if (!workspace?.channels.length) {
       return null
     }
@@ -136,7 +139,7 @@ export function ServerWorkspacePage() {
     }
 
     return workspace.channels[0]?.id ?? null
-  }, [channelId, workspace?.channels])
+  })()
 
   useEffect(() => {
     if (serverId) {
@@ -192,13 +195,22 @@ export function ServerWorkspacePage() {
           categorizedChannels={channelsByCategory.categorizedChannels}
           uncategorizedChannels={channelsByCategory.uncategorizedChannels}
           activeChannelId={resolvedChannelId}
-          onSelectChannel={(nextChannelId) => {
+          onSelectChannel={async (channel) => {
             if (!serverId) {
               return
             }
 
-            markChannelRead(serverId, nextChannelId)
-            navigate(`/app/servers/${serverId}/channels/${nextChannelId}`, { replace: true })
+            markChannelRead(serverId, channel.id)
+
+            if (channel.type === 'VOICE') {
+              try {
+                await voiceControls.joinChannel(channel, workspace.server.name)
+              } catch {
+                return
+              }
+            }
+
+            navigate(`/app/servers/${serverId}/channels/${channel.id}`, { replace: true })
           }}
           onServerSettingsClick={() => {
             navigate(`/app/servers/${serverId}/settings`, {
@@ -226,6 +238,18 @@ export function ServerWorkspacePage() {
           channelId: resolvedChannelId,
         }}
         onClose={() => setIsSearchOpen(false)}
+      />
+
+      <VoiceControlBar
+        session={voiceControls.session}
+        loading={voiceControls.loading}
+        error={voiceControls.error}
+        onToggleMute={() => {
+          void voiceControls.toggleMute().catch(() => undefined)
+        }}
+        onLeave={() => {
+          void voiceControls.leaveChannel().catch(() => undefined)
+        }}
       />
     </main>
   )

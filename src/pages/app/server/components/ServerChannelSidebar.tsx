@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useChannelReadStore } from '../../../../state/channel.state'
+import { normalizeApiError } from '../../../../lib/api-error'
+import {
+  createServerChannelRequest,
+  serverWorkspaceQueryKeys,
+} from '../../../../lib/server/server-workspace.api'
+import { useVoiceStateStore, type VoiceParticipantView } from '../../../../state/voice.state'
 import type {
   ServerCategoryRecord,
   ServerChannelRecord,
@@ -89,45 +96,109 @@ function CategoryRow({
   )
 }
 
+function VoiceParticipantRow({ participant }: { participant: VoiceParticipantView }) {
+  return (
+    <div
+      className="flex items-center gap-2 text-xs text-slate-300"
+      title={participant.isMuted ? 'Muted' : 'Unmuted'}
+    >
+      <span
+        className={[
+          'flex h-4 w-4 items-center justify-center rounded-full',
+          participant.isLocal ? 'bg-[#5865F2]/20 text-[#9aa8ff]' : 'bg-white/[0.06] text-slate-400',
+        ].join(' ')}
+      >
+        {participant.isLocal ? '◉' : '•'}
+      </span>
+      <span className="min-w-0 truncate">
+        {participant.displayName}
+        {participant.isLocal ? ' (You)' : ''}
+      </span>
+      {participant.isMuted ? (
+        <span className="rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">
+          muted
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function ChannelAddIcon({
+  type,
+}: {
+  type: 'TEXT' | 'VOICE'
+}) {
+  return type === 'VOICE' ? (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path d="M6 10h4l5-4v12l-5-4H6v-4z" fill="currentColor" />
+      <path d="M12 16v5M9.5 18.5h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  ) : (
+    <PlusIcon />
+  )
+}
+
 function ChannelItem({
   serverId,
   channel,
   isActive,
   isUnread,
+  voiceParticipants,
   onSelect,
 }: {
   serverId: string
   channel: ServerChannelRecord
   isActive: boolean
   isUnread: boolean
-  onSelect: (channelId: string) => void
+  voiceParticipants: VoiceParticipantView[]
+  onSelect: (channel: ServerChannelRecord) => void | Promise<void>
 }) {
   const labelTone = isActive
     ? 'bg-white/10 text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)]'
     : 'text-slate-300 hover:bg-white/[0.05] hover:text-white'
 
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(channel.id)}
-      className={[
-        'group flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition focus:outline-none focus:ring-2 focus:ring-[#5865F2]/70',
-        labelTone,
-      ].join(' ')}
-      aria-label={`Open ${channel.name} in server ${serverId}`}
-    >
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center text-slate-400 group-hover:text-slate-200">
-        <ChannelTypeIcon type={channel.type} />
-      </span>
-
-      <span
-        className={['min-w-0 flex-1 truncate', isActive || isUnread ? 'font-semibold' : 'font-medium'].join(' ')}
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={() => {
+          void onSelect(channel)
+        }}
+        className={[
+          'group flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition focus:outline-none focus:ring-2 focus:ring-[#5865F2]/70',
+          labelTone,
+        ].join(' ')}
+        aria-label={`Open ${channel.name} in server ${serverId}`}
       >
-        {channel.name}
-      </span>
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center text-slate-400 group-hover:text-slate-200">
+          <ChannelTypeIcon type={channel.type} />
+        </span>
 
-      {isUnread ? <span className="h-2 w-2 shrink-0 rounded-full bg-[#3BA55D]" aria-hidden="true" /> : null}
-    </button>
+        <span
+          className={['min-w-0 flex-1 truncate', isActive || isUnread ? 'font-semibold' : 'font-medium'].join(' ')}
+        >
+          {channel.name}
+        </span>
+
+        {isUnread ? <span className="h-2 w-2 shrink-0 rounded-full bg-[#3BA55D]" aria-hidden="true" /> : null}
+      </button>
+
+      {channel.type === 'VOICE' && voiceParticipants.length > 0 ? (
+        <div className="ml-7 space-y-1 border-l border-white/[0.06] pl-3">
+          {voiceParticipants.map((participant) => (
+            <VoiceParticipantRow key={participant.sid} participant={participant} />
+          ))}
+        </div>
+      ) : null}
+    </div>
   )
 }
 
@@ -143,15 +214,48 @@ export function ServerChannelSidebar({
   categorizedChannels: Map<string, ServerChannelRecord[]>
   uncategorizedChannels: ServerChannelRecord[]
   activeChannelId: string | null
-  onSelectChannel: (channelId: string) => void
+  onSelectChannel: (channel: ServerChannelRecord) => void | Promise<void>
   onServerSettingsClick: () => void
 }) {
   const isChannelUnread = useChannelReadStore((state) => state.isChannelUnread)
+  const voiceSession = useVoiceStateStore((state) => state)
+  const queryClient = useQueryClient()
   const [openCategoryIds, setOpenCategoryIds] = useState<Record<string, boolean>>({})
   const [isServerMenuOpen, setIsServerMenuOpen] = useState(false)
   const serverMenuRef = useRef<HTMLDivElement | null>(null)
 
   const categoryList = useMemo(() => [...workspace.categories], [workspace.categories])
+  const createChannelMutation = useMutation({
+    mutationFn: async (type: 'TEXT' | 'VOICE') => {
+      const existingNames = new Set(
+        workspace.channels.map((channel) => channel.name.trim().toLowerCase()),
+      )
+
+      const baseName = type === 'VOICE' ? 'new-voice-channel' : 'new-text-channel'
+      let candidateName = baseName
+      let counter = 2
+      while (existingNames.has(candidateName)) {
+        candidateName = `${baseName}-${counter}`
+        counter += 1
+      }
+
+      return createServerChannelRequest(workspace.server.id, {
+        name: candidateName,
+        type,
+        categoryId: workspace.categories[0]?.id ?? null,
+      })
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: serverWorkspaceQueryKeys.server(workspace.server.id),
+      })
+      setIsServerMenuOpen(false)
+    },
+  })
+
+  const createChannelError = createChannelMutation.error
+    ? normalizeApiError(createChannelMutation.error, 'Gagal membuat channel baru.').message
+    : null
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -174,6 +278,9 @@ export function ServerChannelSidebar({
       document.removeEventListener('keydown', handleEscape)
     }
   }, [])
+
+  const voiceParticipantsForChannel = (channel: ServerChannelRecord) =>
+    channel.type === 'VOICE' && voiceSession.channelId === channel.id ? voiceSession.participants : []
 
   return (
     <aside className="hidden w-[320px] shrink-0 border-r border-white/[0.06] bg-[#2F3136] lg:flex lg:flex-col">
@@ -216,6 +323,42 @@ export function ServerChannelSidebar({
                   <SettingsIcon className="h-4 w-4 shrink-0 text-slate-300" />
                   <span>Server Settings</span>
                 </button>
+
+                <div className="my-2 border-t border-white/[0.06]" />
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={createChannelMutation.isPending}
+                  onClick={() => {
+                    void createChannelMutation.mutateAsync('TEXT')
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-100 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center text-slate-300">
+                    <ChannelAddIcon type="TEXT" />
+                  </span>
+                  <span>{createChannelMutation.isPending ? 'Membuat channel...' : 'Tambah Channel'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={createChannelMutation.isPending}
+                  onClick={() => {
+                    void createChannelMutation.mutateAsync('VOICE')
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-100 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center text-slate-300">
+                    <ChannelAddIcon type="VOICE" />
+                  </span>
+                  <span>{createChannelMutation.isPending ? 'Membuat voice...' : 'Tambah Voice'}</span>
+                </button>
+
+                {createChannelError ? (
+                  <div className="px-3 pb-2 pt-1 text-xs text-rose-200">{createChannelError}</div>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -256,6 +399,7 @@ export function ServerChannelSidebar({
                         channel={channel}
                         isActive={channel.id === activeChannelId}
                         isUnread={isChannelUnread(workspace.server.id, channel.id)}
+                        voiceParticipants={voiceParticipantsForChannel(channel)}
                         onSelect={onSelectChannel}
                       />
                     ))}
@@ -279,6 +423,7 @@ export function ServerChannelSidebar({
                     channel={channel}
                     isActive={channel.id === activeChannelId}
                     isUnread={isChannelUnread(workspace.server.id, channel.id)}
+                    voiceParticipants={voiceParticipantsForChannel(channel)}
                     onSelect={onSelectChannel}
                   />
                 ))}

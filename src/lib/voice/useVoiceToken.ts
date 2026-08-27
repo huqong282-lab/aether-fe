@@ -18,6 +18,14 @@ async function safelyDisconnectRoom(room: Room | null) {
   }
 }
 
+async function disconnectRoom(room: Room | null) {
+  if (!room) {
+    return
+  }
+
+  await room.disconnect()
+}
+
 export function useVoiceToken() {
   const [room, setRoom] = useState<Room | null>(null)
   const [loading, setLoading] = useState(false)
@@ -39,7 +47,16 @@ export function useVoiceToken() {
     setLoading(false)
     setError(null)
 
-    await safelyDisconnectRoom(currentRoom)
+    try {
+      await disconnectRoom(currentRoom)
+    } catch (leaveError) {
+      const message =
+        leaveError instanceof Error && leaveError.message
+          ? leaveError.message
+          : 'Gagal keluar dari voice channel.'
+      setError(message)
+      throw leaveError
+    }
   }, [])
 
   const join = useCallback(
@@ -65,11 +82,12 @@ export function useVoiceToken() {
           throw new Error('Backend tidak mengembalikan livekitUrl atau serverUrl.')
         }
 
-        if (requestId !== joinRequestIdRef.current) {
-          return roomRef.current
-        }
-
         const nextRoom = new Room()
+
+        if (requestId !== joinRequestIdRef.current) {
+          await safelyDisconnectRoom(nextRoom)
+          return null
+        }
 
         try {
           await nextRoom.connect(livekitUrl, response.data.token)
@@ -80,7 +98,7 @@ export function useVoiceToken() {
 
         if (requestId !== joinRequestIdRef.current) {
           await safelyDisconnectRoom(nextRoom)
-          return roomRef.current
+          return null
         }
 
         const previousRoom = roomRef.current
